@@ -23,7 +23,6 @@ export default function Matches({ user }) {
           betsMap[`${bet.match_id}-${bet.bet_type}`] = bet.bet_value
         })
         setBets(betsMap)
-        console.log("bets chargés:", betsMap)
       }
     }
     loadBets()
@@ -45,15 +44,21 @@ export default function Matches({ user }) {
   }
 
   async function placeBet(matchId, betType, betValue) {
-    const key = `${matchId}-${betType}`
+    const { data: existing } = await supabase
+      .from("bets")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("match_id", matchId)
+      .eq("bet_type", betType)
+      .maybeSingle()
 
-    console.log("pari placé:", matchId, betType, betValue)
-    const { error } = await supabase.from("bets").upsert(
-      { user_id: user.id, match_id: matchId, bet_type: betType, bet_value: betValue },
-      { onConflict: "user_id,match_id,bet_type" }
-    )
+    if (existing) {
+      await supabase.from("bets").update({ bet_value: betValue }).eq("id", existing.id)
+    } else {
+      await supabase.from("bets").insert({ user_id: user.id, match_id: matchId, bet_type: betType, bet_value: betValue })
+    }
 
-    if (!error) setBets(prev => ({ ...prev, [key]: betValue }))
+    setBets(prev => ({ ...prev, [`${matchId}-${betType}`]: betValue }))
   }
 
   if (loading) return <p style={{ padding: "2rem" }}>Chargement des matchs...</p>
