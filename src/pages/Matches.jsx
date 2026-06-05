@@ -46,17 +46,14 @@ export default function Matches({ user }) {
 
   async function placeBet(matchId, betType, betValue) {
     const key = `${matchId}-${betType}`
-    if (bets[key]) return
 
     console.log("pari placé:", matchId, betType, betValue)
-    await supabase.from("bets").insert({
-      user_id: user.id,
-      match_id: matchId,
-      bet_type: betType,
-      bet_value: betValue
-    })
+    const { error } = await supabase.from("bets").upsert(
+      { user_id: user.id, match_id: matchId, bet_type: betType, bet_value: betValue },
+      { onConflict: "user_id,match_id,bet_type" }
+    )
 
-    setBets(prev => ({ ...prev, [key]: betValue }))
+    if (!error) setBets(prev => ({ ...prev, [key]: betValue }))
   }
 
   if (loading) return <p style={{ padding: "2rem" }}>Chargement des matchs...</p>
