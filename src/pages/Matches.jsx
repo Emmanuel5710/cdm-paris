@@ -61,13 +61,15 @@ export default function Matches({ user }) {
 
   useEffect(() => {
     if (!user) return
-    supabase.from("bets").select("match_id, bet_type, bet_value").eq("user_id", user.id)
-      .then(({ data }) => {
-        if (!data) return
-        const map = {}
-        data.forEach(b => { map[`${b.match_id}-${b.bet_type}`] = b.bet_value })
-        setBets(map)
-      })
+    async function loadBets() {
+      const { data } = await supabase.from("bets").select("match_id, bet_type, bet_value").eq("user_id", user.id)
+      if (data) {
+        const betsMap = {}
+        data.forEach(bet => { betsMap[`${bet.match_id}-${bet.bet_type}`] = bet.bet_value })
+        setBets(betsMap)
+      }
+    }
+    loadBets()
   }, [user])
 
   useEffect(() => {
@@ -171,6 +173,7 @@ export default function Matches({ user }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   {match.home.logo && (
                     <img src={match.home.logo} alt="" width="26" height="26"
+                      referrerPolicy="no-referrer"
                       style={{ objectFit: "contain", flexShrink: 0 }} />
                   )}
                   <span translate="no" style={{
@@ -197,6 +200,7 @@ export default function Matches({ user }) {
                   }}>{match.away.name}</span>
                   {match.away.logo && (
                     <img src={match.away.logo} alt="" width="26" height="26"
+                      referrerPolicy="no-referrer"
                       style={{ objectFit: "contain", flexShrink: 0 }} />
                   )}
                 </div>
