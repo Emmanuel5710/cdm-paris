@@ -10,6 +10,25 @@ export default function Matches({ user }) {
     fetchMatches()
   }, [])
 
+  useEffect(() => {
+    if (!user) return
+    async function loadBets() {
+      const { data } = await supabase
+        .from("bets")
+        .select("match_id, bet_type, bet_value")
+        .eq("user_id", user.id)
+      if (data) {
+        const betsMap = {}
+        data.forEach(bet => {
+          betsMap[`${bet.match_id}-${bet.bet_type}`] = bet.bet_value
+        })
+        setBets(betsMap)
+        console.log("bets chargés:", betsMap)
+      }
+    }
+    loadBets()
+  }, [user])
+
   async function fetchMatches() {
     const { data } = await supabase
       .from("matches")
@@ -26,16 +45,10 @@ export default function Matches({ user }) {
   }
 
   async function placeBet(matchId, betType, betValue) {
-    const existing = await supabase
-      .from("bets")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("match_id", matchId)
-      .eq("bet_type", betType)
-      .single()
+    const key = `${matchId}-${betType}`
+    if (bets[key]) return
 
-    if (existing.data) return
-
+    console.log("pari placé:", matchId, betType, betValue)
     await supabase.from("bets").insert({
       user_id: user.id,
       match_id: matchId,
@@ -43,7 +56,7 @@ export default function Matches({ user }) {
       bet_value: betValue
     })
 
-    setBets(prev => ({ ...prev, [`${matchId}-${betType}`]: betValue }))
+    setBets(prev => ({ ...prev, [key]: betValue }))
   }
 
   if (loading) return <p style={{ padding: "2rem" }}>Chargement des matchs...</p>
