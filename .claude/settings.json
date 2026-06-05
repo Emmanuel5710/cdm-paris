@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git -C /c/Users/Utilisateur/cdm-paris add . && git -C /c/Users/Utilisateur/cdm-paris diff --cached --quiet || git -C /c/Users/Utilisateur/cdm-paris commit -m 'update' && git -C /c/Users/Utilisateur/cdm-paris push 2>/dev/null || true",
+            "statusMessage": "Git push...",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
