@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
 
-const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"
+const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=200&dates=20260611-20260719"
 const C = {
   bg: "#0F1923", card: "#1A2634", border: "#243447",
   primary: "#1D9E75", primaryGlow: "rgba(29,158,117,0.18)",

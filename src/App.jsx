@@ -24,6 +24,7 @@ export default function App() {
   const [password, setPassword] = useState("")
   const [username, setUsername] = useState("")
   const [isLogin, setIsLogin] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -162,9 +163,16 @@ export default function App() {
           )}
           <input placeholder="Email" value={email} type="email"
             onChange={e => setEmail(e.target.value)} style={inp} />
-          <input placeholder="Mot de passe" type="password" value={password}
-            onChange={e => setPassword(e.target.value)}
-            style={{ ...inp, marginBottom: error ? "8px" : "16px" }} />
+          <div style={{ position: "relative", marginBottom: error ? "8px" : "16px" }}>
+            <input placeholder="Mot de passe" type={showPassword ? "text" : "password"} value={password}
+              onChange={e => setPassword(e.target.value)}
+              style={{ ...inp, marginBottom: 0, paddingRight: "44px" }} />
+            <button type="button" onClick={() => setShowPassword(v => !v)} style={{
+              position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
+              background: "none", border: "none", cursor: "pointer", fontSize: "16px",
+              color: "#64748b", padding: "4px",
+            }}>{showPassword ? "🙈" : "👁"}</button>
+          </div>
 
           {error && <p style={{ color: "#f87171", fontSize: "13px", marginBottom: "12px" }}>{error}</p>}
 
