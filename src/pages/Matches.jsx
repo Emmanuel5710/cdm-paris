@@ -65,7 +65,7 @@ export default function Matches({ user }) {
       const { data } = await supabase.from("bets").select("match_id, bet_type, bet_value").eq("user_id", user.id)
       if (data) {
         const betsMap = {}
-        data.forEach(bet => { betsMap[`${bet.match_id}-${bet.bet_type}`] = bet.bet_value })
+        data.forEach(bet => { betsMap[`${parseInt(bet.match_id)}-${bet.bet_type}`] = bet.bet_value })
         setBets(betsMap)
       }
     }
@@ -93,17 +93,18 @@ export default function Matches({ user }) {
   }
 
   async function placeBet(matchId, betType, betValue) {
+    const id = parseInt(matchId)
     const { data: existing } = await supabase
       .from("bets").select("id")
-      .eq("user_id", user.id).eq("match_id", matchId).eq("bet_type", betType)
+      .eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType)
       .maybeSingle()
 
     if (existing) {
       await supabase.from("bets").update({ bet_value: betValue }).eq("id", existing.id)
     } else {
-      await supabase.from("bets").insert({ user_id: user.id, match_id: matchId, bet_type: betType, bet_value: betValue })
+      await supabase.from("bets").insert({ user_id: user.id, match_id: id, bet_type: betType, bet_value: betValue })
     }
-    setBets(prev => ({ ...prev, [`${matchId}-${betType}`]: betValue }))
+    setBets(prev => ({ ...prev, [`${id}-${betType}`]: betValue }))
   }
 
   async function calculatePoints() {
@@ -134,7 +135,7 @@ export default function Matches({ user }) {
       </button>
 
       {matches.map(match => {
-        const betKey = `${match.id}-result`
+        const betKey = `${parseInt(match.id)}-result`
         const myBet = bets[betKey]
         const isLive = match.state === "in"
         const isFinished = match.state === "post"
@@ -219,7 +220,7 @@ export default function Matches({ user }) {
                     { label: match.away.name, value: "away" },
                   ].map(opt => (
                     <button key={opt.value}
-                      onClick={() => placeBet(match.id, "result", opt.value)}
+                      onClick={() => placeBet(parseInt(match.id), "result", opt.value)}
                       style={{
                         flex: 1, padding: "8px 4px", border: "1px solid",
                         borderColor: myBet === opt.value ? "#1D9E75" : "#e0e0e0",
