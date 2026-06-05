@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1D9E75"/>
+  <!-- Ball -->
+  <circle cx="256" cy="256" r="148" fill="white" stroke="#e0e0e0" stroke-width="6"/>
+  <!-- Pentagon center -->
+  <polygon points="256,152 302,185 284,238 228,238 210,185" fill="#1a1a1a"/>
+  <!-- Side pentagons -->
+  <polygon points="152,206 196,196 210,246 176,278 136,260" fill="#1a1a1a"/>
+  <polygon points="360,206 316,196 302,246 336,278 376,260" fill="#1a1a1a"/>
+  <polygon points="200,326 220,276 292,276 312,326 256,358" fill="#1a1a1a"/>
+</svg>
