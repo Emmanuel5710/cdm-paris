@@ -9,7 +9,8 @@ const C = {
   inner: "#0d1720", cancel: "#ef444433", cancelText: "#f87171",
 }
 
-const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "possession_home", "scorer"]
+// scorer_N types are dynamic — not listed here
+const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "yellow_card_team", "possession_home"]
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ function BetCard({ icon, title, hasBet, onCancel, children }) {
   )
 }
 
-// ─── Stepper (shared by Goals + Corners) ─────────────────────────────────────
+// ─── Stepper (Goals only) ─────────────────────────────────────────────────────
 
 function Stepper({ value, min, max, display, onChange }) {
   const canDec = value != null && value > min
@@ -127,33 +128,61 @@ function GoalsBet({ saved, onSave, onCancel }) {
   )
 }
 
-// ─── Corners bet ──────────────────────────────────────────────────────────────
+// ─── Corners bet — input numérique libre min=0 max=30 ─────────────────────────
 
 function CornersBet({ saved, onSave, onCancel }) {
-  const val = saved != null ? parseInt(saved) : null
+  const savedNum = saved != null ? parseInt(saved) : null
+  const [draft, setDraft] = useState(savedNum != null ? String(savedNum) : "")
+
+  useEffect(() => { setDraft(savedNum != null ? String(savedNum) : "") }, [savedNum])
+
+  function commit(raw) {
+    const n = parseInt(raw)
+    if (!isNaN(n) && n >= 0 && n <= 30) onSave(String(n))
+  }
+
   return (
-    <BetCard icon="🚩" title="Corners" hasBet={val != null} onCancel={val != null ? onCancel : null}>
+    <BetCard icon="🚩" title="Corners" hasBet={savedNum != null} onCancel={savedNum != null ? onCancel : null}>
       <p style={{ fontSize: "12px", color: C.dim, marginBottom: "13px" }}>
         Je parie qu'il y aura plus de{" "}
-        <strong style={{ color: val != null ? C.primary : C.muted }}>{val != null ? `${val} corners` : "… corners"}</strong>
+        <strong style={{ color: savedNum != null ? C.primary : C.muted }}>
+          {savedNum != null ? `${savedNum} corners` : "… corners"}
+        </strong>
       </p>
-      <Stepper value={val} min={5} max={15} display={n => `${n}`} onChange={n => onSave(String(n))} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "14px" }}>
+        <input
+          type="number" min={0} max={30} value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={e => commit(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { commit(e.target.value); e.target.blur() } }}
+          style={{
+            width: "100px", background: "#1a2634",
+            border: `1.5px solid ${draft !== "" ? C.primary : C.border}`,
+            borderRadius: "10px", padding: "10px 0", color: C.text,
+            fontSize: "28px", fontWeight: "800", outline: "none",
+            textAlign: "center", fontFamily: "inherit", transition: "border-color 0.15s",
+          }}
+        />
+        <span style={{ fontSize: "14px", color: C.muted, fontWeight: "600" }}>corners</span>
+      </div>
     </BetCard>
   )
 }
 
-// ─── Red card bet ─────────────────────────────────────────────────────────────
+// ─── Card bet (shared layout for red & yellow) ────────────────────────────────
 
-function RedCardBet({ saved, onSave, onCancel, homeName, awayName }) {
+function CardBet({ icon, title, betType, saved, onSave, onCancel, homeName, awayName }) {
   const opts = [
-    { value: "none", label: "Aucun", sub: "Pas de carton rouge" },
+    { value: "none", label: "Aucun", sub: `Pas de ${betType === "red_card_team" ? "rouge" : "jaune"}` },
     { value: "home", label: homeName, sub: "Équipe domicile" },
     { value: "away", label: awayName, sub: "Équipe extérieur" },
     { value: "both", label: "Les deux", sub: "Les deux équipes" },
   ]
   return (
-    <BetCard icon="🟥" title="Carton rouge" hasBet={!!saved} onCancel={saved ? onCancel : null}>
-      <p style={{ fontSize: "12px", color: C.dim, marginBottom: "11px" }}>Quelle équipe prendra un carton rouge ?</p>
+    <BetCard icon={icon} title={title} hasBet={!!saved} onCancel={saved ? onCancel : null}>
+      <p style={{ fontSize: "12px", color: C.dim, marginBottom: "11px" }}>
+        Quelle équipe prendra un carton {betType === "red_card_team" ? "rouge" : "jaune"} ?
+      </p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
         {opts.map(opt => {
           const sel = saved === opt.value
@@ -179,7 +208,7 @@ function RedCardBet({ saved, onSave, onCancel, homeName, awayName }) {
   )
 }
 
-// ─── Possession bet ───────────────────────────────────────────────────────────
+// ─── Possession bet — slider 1–99% step 1 ────────────────────────────────────
 
 function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
   const savedNum = saved != null ? parseInt(saved) : null
@@ -188,10 +217,12 @@ function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
   useEffect(() => { setDraft(savedNum ?? 50) }, [savedNum])
 
   const awayPct = 100 - draft
+  const fillPct = ((draft - 1) / 98) * 100
+
   return (
     <BetCard icon="📊" title="Possession domicile" hasBet={savedNum != null} onCancel={savedNum != null ? onCancel : null}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "10px" }}>
-        <div style={{ textAlign: "left" }}>
+        <div>
           <div style={{ fontSize: "10px", color: C.dim, marginBottom: "2px" }} translate="no">{homeName}</div>
           <div style={{ fontSize: "26px", fontWeight: "800", color: C.primary }}>{draft}%</div>
         </div>
@@ -205,10 +236,10 @@ function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
         <div style={{
           position: "absolute", top: "50%", left: 0, right: 0, height: "4px",
           transform: "translateY(-50%)", borderRadius: "2px", overflow: "hidden",
-          background: `linear-gradient(to right, ${C.primary} ${((draft - 30) / 40) * 100}%, ${C.border} ${((draft - 30) / 40) * 100}%)`,
+          background: `linear-gradient(to right, ${C.primary} ${fillPct}%, ${C.border} ${fillPct}%)`,
           pointerEvents: "none",
         }} />
-        <input type="range" min={30} max={70} step={5} value={draft}
+        <input type="range" min={1} max={99} step={1} value={draft}
           onChange={e => setDraft(parseInt(e.target.value))}
           onMouseUp={e => onSave(e.target.value)}
           onTouchEnd={e => onSave(e.target.value)}
@@ -216,47 +247,127 @@ function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
         />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2px" }}>
-        <span style={{ fontSize: "10px", color: C.dim }}>30%</span>
-        <span style={{ fontSize: "10px", color: C.dim }}>70%</span>
+        <span style={{ fontSize: "10px", color: C.dim }}>1%</span>
+        <span style={{ fontSize: "10px", color: C.dim }}>99%</span>
       </div>
     </BetCard>
   )
 }
 
-// ─── Scorer bet ───────────────────────────────────────────────────────────────
+// ─── Multi-scorer bet ─────────────────────────────────────────────────────────
 
-function ScorerBet({ saved, onSave, onCancel }) {
-  const [draft, setDraft] = useState(saved ?? "")
-  useEffect(() => { setDraft(saved ?? "") }, [saved])
+function ScorersBet({ savedScorers, onSave, onCancel }) {
+  // savedScorers = { "scorer_1": "Mbappé", "scorer_2": "Giroud" }
+  const savedNums = Object.keys(savedScorers)
+    .map(k => parseInt(k.replace("scorer_", "")))
+    .filter(n => !isNaN(n))
+    .sort((a, b) => a - b)
 
-  function commit() { if (draft.trim()) onSave(draft.trim()) }
-  const isDirty = draft.trim() !== (saved ?? "") && draft.trim().length > 0
+  const [emptySlots, setEmptySlots] = useState([])
+  const [drafts, setDrafts] = useState({})
+
+  const savedScorersKey = JSON.stringify(savedScorers)
+  useEffect(() => {
+    setEmptySlots(prev => prev.filter(n => !savedScorers[`scorer_${n}`]))
+  }, [savedScorersKey])
+
+  const allNums = [...new Set([...savedNums, ...emptySlots])].sort((a, b) => a - b)
+  const hasBet = savedNums.length > 0
+
+  function addSlot() {
+    if (allNums.length >= 5) return
+    const maxN = Math.max(0, ...savedNums, ...emptySlots)
+    const nextN = maxN + 1
+    setEmptySlots(prev => [...prev, nextN])
+    setDrafts(prev => ({ ...prev, [nextN]: "" }))
+  }
+
+  function getDraft(n) {
+    if (n in drafts) return drafts[n]
+    return savedScorers[`scorer_${n}`] ?? ""
+  }
+
+  function updateDraft(n, val) {
+    setDrafts(prev => ({ ...prev, [n]: val }))
+  }
+
+  function commit(n) {
+    const d = getDraft(n).trim()
+    if (d) {
+      onSave(`scorer_${n}`, d)
+      setDrafts(prev => { const next = { ...prev }; delete next[n]; return next })
+    }
+  }
+
+  function removeRow(n) {
+    if (savedScorers[`scorer_${n}`]) onCancel(`scorer_${n}`)
+    setEmptySlots(prev => prev.filter(x => x !== n))
+    setDrafts(prev => { const next = { ...prev }; delete next[n]; return next })
+  }
+
+  function cancelAll() {
+    savedNums.forEach(n => onCancel(`scorer_${n}`))
+    setEmptySlots([])
+    setDrafts({})
+  }
+
+  const rowInputStyle = draft => ({
+    flex: 1, background: "#1a2634",
+    border: `1.5px solid ${draft ? C.primary : C.border}`,
+    borderRadius: "9px", padding: "9px 12px", color: C.text, fontSize: "13px",
+    outline: "none", transition: "border-color 0.15s", fontFamily: "inherit",
+  })
+
+  const iconBtn = (color, bg) => ({
+    width: "36px", height: "36px", borderRadius: "8px",
+    border: `1.5px solid ${color}55`, background: bg,
+    cursor: "pointer", color,
+    fontSize: "13px", fontWeight: "700",
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+  })
 
   return (
-    <BetCard icon="🎯" title="Buteur du match" hasBet={!!saved} onCancel={saved ? onCancel : null}>
+    <BetCard icon="🎯" title="Buteurs du match" hasBet={hasBet} onCancel={hasBet ? cancelAll : null}>
       <p style={{ fontSize: "12px", color: C.dim, marginBottom: "10px" }}>
-        Je parie que ce joueur marquera
+        Je parie que ces joueurs marqueront
       </p>
-      <div style={{ display: "flex", gap: "8px" }}>
-        <input type="text" value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={e => { if (e.key === "Enter") { commit(); e.target.blur() } }}
-          placeholder="Nom du joueur..."
-          style={{
-            flex: 1, background: "#1a2634", border: `1.5px solid ${draft ? C.primary : C.border}`,
-            borderRadius: "9px", padding: "10px 13px", color: C.text, fontSize: "13px",
-            outline: "none", transition: "border-color 0.15s", fontFamily: "inherit",
-          }}
-        />
-        {isDirty && (
-          <button onClick={commit} style={{
-            padding: "10px 16px", background: C.primaryGlow, border: `1.5px solid ${C.primary}`,
-            borderRadius: "9px", color: C.primary, fontSize: "14px", fontWeight: "700",
-            cursor: "pointer", flexShrink: 0,
-          }}>✓</button>
-        )}
-      </div>
+
+      {allNums.length === 0 && (
+        <p style={{ fontSize: "12px", color: C.dim, fontStyle: "italic", marginBottom: "8px", textAlign: "center" }}>
+          Aucun buteur — cliquez sur &quot;+ Ajouter&quot;
+        </p>
+      )}
+
+      {allNums.map((n, i) => {
+        const savedVal = savedScorers[`scorer_${n}`]
+        const draft = getDraft(n)
+        const isDirty = draft.trim() !== (savedVal ?? "") && draft.trim().length > 0
+        return (
+          <div key={n} style={{ display: "flex", gap: "7px", marginBottom: "7px", alignItems: "center" }}>
+            <input
+              type="text" value={draft}
+              onChange={e => updateDraft(n, e.target.value)}
+              onBlur={() => commit(n)}
+              onKeyDown={e => { if (e.key === "Enter") { commit(n); e.target.blur() } }}
+              placeholder={`Buteur ${i + 1}...`}
+              style={rowInputStyle(draft)}
+            />
+            {isDirty && (
+              <button onClick={() => commit(n)} style={iconBtn(C.primary, C.primaryGlow)}>✓</button>
+            )}
+            <button onClick={() => removeRow(n)} style={iconBtn(C.cancelText, C.cancel)}>✕</button>
+          </div>
+        )
+      })}
+
+      {allNums.length < 5 && (
+        <button onClick={addSlot} style={{
+          width: "100%", padding: "9px", marginTop: allNums.length ? "4px" : 0,
+          border: `1.5px dashed ${C.border}`, borderRadius: "9px",
+          background: "none", cursor: "pointer", color: C.muted,
+          fontSize: "12px", fontWeight: "600",
+        }}>+ Ajouter un buteur</button>
+      )}
     </BetCard>
   )
 }
@@ -265,20 +376,27 @@ function ScorerBet({ saved, onSave, onCancel }) {
 
 function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
   const g = key => bets[`${matchId}-${key}`]
+
+  const cardLabel = val => ({ none: "Aucun", home: homeName, away: awayName, both: "Les deux équipes" })[val] ?? val
+
+  const scorerValues = Object.entries(bets)
+    .filter(([k]) => k.startsWith(`${matchId}-scorer_`))
+    .map(([, v]) => v)
+    .filter(Boolean)
+
   const goals = g("exact_goals")
   const corners = g("exact_corners")
   const redCard = g("red_card_team")
+  const yellowCard = g("yellow_card_team")
   const possession = g("possession_home")
-  const scorer = g("scorer")
-
-  const redCardLabel = { none: "Aucun carton rouge", home: homeName, away: awayName, both: "Les deux équipes" }
 
   const items = [
     goals != null && { icon: "⚽", text: `Exactement ${goals === "1" ? "1 but" : `${goals} buts`}` },
     corners != null && { icon: "🚩", text: `Plus de ${corners} corners` },
-    redCard && { icon: "🟥", text: redCardLabel[redCard] ?? redCard },
+    redCard && { icon: "🟥", text: `Rouge : ${cardLabel(redCard)}` },
+    yellowCard && { icon: "🟨", text: `Jaune : ${cardLabel(yellowCard)}` },
     possession != null && { icon: "📊", text: `${homeName} ${possession}% — ${awayName} ${100 - parseInt(possession)}%` },
-    scorer && { icon: "🎯", text: scorer },
+    ...scorerValues.map(name => ({ icon: "🎯", text: name })),
   ].filter(Boolean)
 
   if (!items.length) return null
@@ -415,10 +533,18 @@ export default function Matches({ user }) {
         const isFinished = match.state === "post"
         const isLocked = isLive || isFinished
         const isAdvancedOpen = expandedAdvanced.has(match.id)
-        const advancedCount = ADVANCED_TYPES.filter(t => bets[`${matchId}-${t}`] != null).length
+
+        const scorerCount = Object.keys(bets).filter(k => k.startsWith(`${matchId}-scorer_`)).length
+        const advancedCount = ADVANCED_TYPES.filter(t => bets[`${matchId}-${t}`] != null).length + scorerCount
 
         const save = (type, val) => placeBet(matchId, type, val)
-        const cancel = (type) => cancelBet(matchId, type)
+        const cancel = type => cancelBet(matchId, type)
+
+        const savedScorers = Object.fromEntries(
+          Object.entries(bets)
+            .filter(([k]) => k.startsWith(`${matchId}-scorer_`))
+            .map(([k, v]) => [k.slice(`${matchId}-`.length), v])
+        )
 
         return (
           <div key={match.id}
@@ -502,7 +628,6 @@ export default function Matches({ user }) {
                     )
                   })}
                 </div>
-                {/* Cancel result bet */}
                 {myBet && (
                   <div style={{ textAlign: "center", marginTop: "8px" }}>
                     <button onClick={() => cancel("result")} style={{
@@ -557,24 +682,30 @@ export default function Matches({ user }) {
                       onSave={v => save("exact_corners", v)}
                       onCancel={() => cancel("exact_corners")}
                     />
-                    <RedCardBet
+                    <CardBet
+                      icon="🟥" title="Carton rouge" betType="red_card_team"
                       saved={bets[`${matchId}-red_card_team`]}
                       onSave={v => save("red_card_team", v)}
                       onCancel={() => cancel("red_card_team")}
-                      homeName={match.home.name}
-                      awayName={match.away.name}
+                      homeName={match.home.name} awayName={match.away.name}
+                    />
+                    <CardBet
+                      icon="🟨" title="Carton jaune" betType="yellow_card_team"
+                      saved={bets[`${matchId}-yellow_card_team`]}
+                      onSave={v => save("yellow_card_team", v)}
+                      onCancel={() => cancel("yellow_card_team")}
+                      homeName={match.home.name} awayName={match.away.name}
                     />
                     <PossessionBet
                       saved={bets[`${matchId}-possession_home`]}
                       onSave={v => save("possession_home", v)}
                       onCancel={() => cancel("possession_home")}
-                      homeName={match.home.name}
-                      awayName={match.away.name}
+                      homeName={match.home.name} awayName={match.away.name}
                     />
-                    <ScorerBet
-                      saved={bets[`${matchId}-scorer`]}
-                      onSave={v => save("scorer", v)}
-                      onCancel={() => cancel("scorer")}
+                    <ScorersBet
+                      savedScorers={savedScorers}
+                      onSave={(key, val) => save(key, val)}
+                      onCancel={key => cancel(key)}
                     />
                   </div>
                 )}
@@ -584,10 +715,8 @@ export default function Matches({ user }) {
             {/* Advanced bets — locked summary */}
             {isLocked && (
               <LockedAdvancedSummary
-                bets={bets}
-                matchId={matchId}
-                homeName={match.home.name}
-                awayName={match.away.name}
+                bets={bets} matchId={matchId}
+                homeName={match.home.name} awayName={match.away.name}
               />
             )}
           </div>
