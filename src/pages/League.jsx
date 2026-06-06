@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
+import { RANKS, getRank, getNextRank, getRankProgress, RankShield, PositionBadge } from "../components/ranks"
 
 const C = {
   bg: "#0F1923", card: "#1A2634", border: "#243447",
@@ -9,34 +10,11 @@ const C = {
 
 const AVATAR_COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#ef4444","#3b82f6","#14b8a6","#f97316"]
 
-// ─── Rank system ──────────────────────────────────────────────────────────────
-
-const RANKS = [
-  { name: "Bronze",  icon: "🪨", min: 0,    max: 99,   color: "#b87333" },
-  { name: "Argent",  icon: "⚙️", min: 100,  max: 249,  color: "#94a3b8" },
-  { name: "Or",      icon: "🥇", min: 250,  max: 499,  color: "#f59e0b" },
-  { name: "Diamant", icon: "💎", min: 500,  max: 999,  color: "#60a5fa" },
-  { name: "Légende", icon: "👑", min: 1000, max: null,  color: "#c084fc" },
+const PODIUM_STYLE = [
+  { bg: "rgba(255,215,0,0.10)",  border: "rgba(255,215,0,0.35)",  pts: "#FFD700" },
+  { bg: "rgba(192,192,192,0.08)", border: "rgba(192,192,192,0.3)", pts: "#C0C0C0" },
+  { bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.3)",  pts: "#CD7F32" },
 ]
-
-function getRank(pts) {
-  for (let i = RANKS.length - 1; i >= 0; i--) {
-    if (pts >= RANKS[i].min) return RANKS[i]
-  }
-  return RANKS[0]
-}
-
-function getNextRank(pts) {
-  return RANKS.find(r => r.min > pts) ?? null
-}
-
-function getRankProgress(pts) {
-  const rank = getRank(pts)
-  const next = getNextRank(pts)
-  if (!next) return { pct: 100, rank, next: null }
-  const pct = Math.round(((pts - rank.min) / (next.min - rank.min)) * 100)
-  return { pct, rank, next }
-}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -57,8 +35,7 @@ function ProgressBar({ pct, color, height = 5 }) {
     <div style={{ height, background: C.border, borderRadius: height, overflow: "hidden" }}>
       <div style={{
         height: "100%", width: `${Math.min(100, pct)}%`,
-        background: color, borderRadius: height,
-        transition: "width 0.4s ease",
+        background: color, borderRadius: height, transition: "width 0.4s ease",
       }} />
     </div>
   )
@@ -72,7 +49,7 @@ function MyRankCard({ member }) {
 
   return (
     <div style={{
-      background: C.card, borderRadius: "16px", padding: "20px",
+      borderRadius: "16px", padding: "20px",
       border: `1.5px solid ${rank.color}44`,
       marginBottom: "16px",
       background: `linear-gradient(135deg, ${rank.color}18, ${rank.color}06)`,
@@ -81,15 +58,16 @@ function MyRankCard({ member }) {
         Mon Rang
       </div>
 
-      {/* Rank display */}
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <div style={{ textAlign: "center", minWidth: "60px" }}>
-          <div style={{ fontSize: "42px", lineHeight: 1 }}>{rank.icon}</div>
-          <div style={{ fontSize: "11px", fontWeight: "800", color: rank.color, marginTop: "4px", letterSpacing: "0.5px" }}>
+        {/* Shield + rank name */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: "56px" }}>
+          <RankShield rank={rank} size={44} />
+          <div style={{ fontSize: "11px", fontWeight: "800", color: rank.color, letterSpacing: "0.5px" }}>
             {rank.name.toUpperCase()}
           </div>
         </div>
 
+        {/* Points + progress */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "4px", marginBottom: "10px" }}>
             <span style={{ fontSize: "32px", fontWeight: "800", color: C.text, letterSpacing: "-1px" }}>{totalPts}</span>
@@ -100,11 +78,9 @@ function MyRankCard({ member }) {
             <>
               <ProgressBar pct={pct} color={rank.color} height={6} />
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
-                <span style={{ fontSize: "11px", color: C.dim }}>
-                  {totalPts} / {next.min} pts
-                </span>
+                <span style={{ fontSize: "11px", color: C.dim }}>{totalPts} / {next.min} pts</span>
                 <span style={{ fontSize: "11px", color: rank.color, fontWeight: "600" }}>
-                  {next.icon} {next.name} dans {ptsToNext} pts
+                  {next.name} dans {ptsToNext} pts
                 </span>
               </div>
             </>
@@ -112,22 +88,27 @@ function MyRankCard({ member }) {
             <>
               <ProgressBar pct={100} color={rank.color} height={6} />
               <div style={{ fontSize: "11px", color: rank.color, fontWeight: "700", marginTop: "6px" }}>
-                Rang maximum atteint 👑
+                Rang maximum atteint
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Rank ladder mini */}
-      <div style={{ display: "flex", gap: "4px", marginTop: "16px", justifyContent: "center" }}>
-        {RANKS.map((r, i) => {
+      {/* Rank ladder */}
+      <div style={{ display: "flex", gap: "8px", marginTop: "18px", justifyContent: "center", alignItems: "flex-end" }}>
+        {RANKS.map(r => {
           const active = r.name === rank.name
-          const passed = r.min < rank.min || active
+          const passed = r.min <= rank.min
           return (
-            <div key={r.name} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", opacity: passed ? 1 : 0.35 }}>
-              <span style={{ fontSize: active ? "18px" : "13px", transition: "font-size 0.2s" }}>{r.icon}</span>
-              {active && <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: r.color }} />}
+            <div key={r.name} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: "4px",
+              opacity: passed ? 1 : 0.3, transition: "opacity 0.2s",
+            }}>
+              <RankShield rank={r} size={active ? 28 : 20} />
+              {active && (
+                <div style={{ width: "5px", height: "5px", borderRadius: "50%", background: r.color }} />
+              )}
             </div>
           )
         })}
@@ -275,12 +256,6 @@ export default function League({ user }) {
     </div>
   )
 
-  const PODIUM = [
-    { medal: "🥇", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.4)", pts: "#f59e0b" },
-    { medal: "🥈", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.3)", pts: "#94a3b8" },
-    { medal: "🥉", bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.3)", pts: "#cd7f32" },
-  ]
-
   const myEntry = ranking.find(m => m.user_id === user.id)
 
   return (
@@ -324,7 +299,7 @@ export default function League({ user }) {
             Classement
           </div>
           {ranking.map((member, i) => {
-            const p = PODIUM[i]
+            const pod = PODIUM_STYLE[i]
             const totalPts = member.pts * 10
             const { pct, rank, next } = getRankProgress(totalPts)
             const isMe = member.user_id === user.id
@@ -336,26 +311,28 @@ export default function League({ user }) {
                   padding: "14px 16px", marginBottom: "8px", borderRadius: "14px",
                   background: isMe
                     ? `linear-gradient(135deg, rgba(29,158,117,0.12), rgba(29,158,117,0.04))`
-                    : (p?.bg ?? C.card),
-                  border: `1px solid ${isMe ? "rgba(29,158,117,0.4)" : (p?.border ?? C.border)}`,
+                    : (pod?.bg ?? C.card),
+                  border: `1px solid ${isMe ? "rgba(29,158,117,0.4)" : (pod?.border ?? C.border)}`,
                   animationDelay: `${i * 0.06}s`,
                 }}>
 
-                {/* Position / medal */}
-                <div style={{ width: "28px", textAlign: "center", fontSize: "20px", flexShrink: 0, paddingTop: "2px" }}>
-                  {p?.medal ?? <span style={{ color: C.dim, fontSize: "13px", fontWeight: "700" }}>{i + 1}</span>}
+                {/* Position circle */}
+                <div style={{ flexShrink: 0, paddingTop: "6px" }}>
+                  <PositionBadge position={i + 1} size={26} />
                 </div>
 
                 <Avatar username={member.username} size={40} />
 
-                {/* Name + rank + progress */}
+                {/* Name + rank badge + progress */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                     <span translate="no" style={{ fontWeight: "700", fontSize: "15px", color: C.text }}>
                       {member.username}
                     </span>
-                    {isMe && <span style={{ fontSize: "10px", color: C.primary, fontWeight: "700", background: C.primaryGlow, borderRadius: "20px", padding: "1px 6px" }}>Moi</span>}
-                    <span style={{ fontSize: "12px" }}>{rank.icon}</span>
+                    {isMe && (
+                      <span style={{ fontSize: "10px", color: C.primary, fontWeight: "700", background: C.primaryGlow, borderRadius: "20px", padding: "1px 6px" }}>Moi</span>
+                    )}
+                    <RankShield rank={rank} size={20} />
                     <span style={{ fontSize: "10px", fontWeight: "700", color: rank.color }}>
                       {rank.name.toUpperCase()}
                     </span>
@@ -369,20 +346,20 @@ export default function League({ user }) {
                     <>
                       <ProgressBar pct={pct} color={rank.color} height={4} />
                       <div style={{ fontSize: "10px", color: C.dim, marginTop: "4px" }}>
-                        {totalPts} / {next.min} pts pour {next.icon} {next.name}
+                        {totalPts} / {next.min} pts pour {next.name}
                       </div>
                     </>
                   )}
                   {!next && (
                     <div style={{ fontSize: "10px", color: rank.color, fontWeight: "700", marginTop: "3px" }}>
-                      Rang max 👑
+                      Rang maximum
                     </div>
                   )}
                 </div>
 
                 {/* Points */}
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: "24px", fontWeight: "800", color: p?.pts ?? C.primary }}>
+                  <div style={{ fontSize: "24px", fontWeight: "800", color: pod?.pts ?? C.primary }}>
                     {totalPts}
                   </div>
                   <div style={{ fontSize: "10px", color: C.dim, marginTop: "-2px" }}>pts</div>

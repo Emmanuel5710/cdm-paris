@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
+import { RANKS, getRank, getNextRank, getRankProgress, RankShield, PositionBadge } from "../components/ranks"
 
 const C = {
   bg: "#0F1923", card: "#1A2634", border: "#243447",
@@ -9,28 +10,11 @@ const C = {
 
 const AVATAR_COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#ef4444","#3b82f6","#14b8a6","#f97316"]
 
-// ─── Rank system (same thresholds as League) ──────────────────────────────────
-
-const RANKS = [
-  { name: "Bronze",  icon: "🪨", min: 0,    max: 99,  color: "#b87333" },
-  { name: "Argent",  icon: "⚙️", min: 100,  max: 249, color: "#94a3b8" },
-  { name: "Or",      icon: "🥇", min: 250,  max: 499, color: "#f59e0b" },
-  { name: "Diamant", icon: "💎", min: 500,  max: 999, color: "#60a5fa" },
-  { name: "Légende", icon: "👑", min: 1000, max: null, color: "#c084fc" },
+const PODIUM_STYLE = [
+  { bg: "rgba(255,215,0,0.10)",  border: "rgba(255,215,0,0.35)",  pts: "#FFD700" },
+  { bg: "rgba(192,192,192,0.08)", border: "rgba(192,192,192,0.3)", pts: "#C0C0C0" },
+  { bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.3)",  pts: "#CD7F32" },
 ]
-
-function getRank(pts) {
-  for (let i = RANKS.length - 1; i >= 0; i--) {
-    if (pts >= RANKS[i].min) return RANKS[i]
-  }
-  return RANKS[0]
-}
-
-function getNextRank(pts) {
-  return RANKS.find(r => r.min > pts) ?? null
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ username, size = 38 }) {
   const initials = (username || "?").slice(0, 2).toUpperCase()
@@ -55,14 +39,6 @@ function ProgressBar({ pct, color, height = 4 }) {
     </div>
   )
 }
-
-const PODIUM = [
-  { medal: "🥇", bg: "rgba(245,158,11,0.12)", border: "rgba(245,158,11,0.4)", ptsColor: "#f59e0b" },
-  { medal: "🥈", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.3)", ptsColor: "#94a3b8" },
-  { medal: "🥉", bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.3)", ptsColor: "#cd7f32" },
-]
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Ranking({ user }) {
   const [players, setPlayers] = useState([])
@@ -95,8 +71,8 @@ export default function Ranking({ user }) {
   )
 
   const myEntry = players.find(p => p.id === user.id)
-  const myRank = myEntry ? getRank(myEntry.points_total) : null
   const myPos = myEntry ? players.findIndex(p => p.id === user.id) + 1 : null
+  const myRankData = myEntry ? getRankProgress(myEntry.points_total) : null
 
   return (
     <div style={{ padding: "16px", maxWidth: "600px", margin: "0 auto" }}>
@@ -113,7 +89,7 @@ export default function Ranking({ user }) {
         </div>
 
         {/* My position summary */}
-        {myEntry && (
+        {myEntry && myRankData && (
           <div style={{
             marginTop: "14px", paddingTop: "14px", borderTop: `1px solid rgba(29,158,117,0.2)`,
             display: "flex", alignItems: "center", gap: "12px",
@@ -126,14 +102,18 @@ export default function Ranking({ user }) {
               <div style={{ fontSize: "10px", color: C.muted }}>Ma place</div>
             </div>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "18px" }}>{myRank.icon}</span>
-                <span style={{ fontSize: "14px", fontWeight: "700", color: myRank.color }}>{myRank.name}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <RankShield rank={myRankData.rank} size={26} />
+                <span style={{ fontSize: "14px", fontWeight: "700", color: myRankData.rank.color }}>
+                  {myRankData.rank.name}
+                </span>
               </div>
-              <div style={{ fontSize: "13px", color: C.muted, marginTop: "2px" }}>
+              <div style={{ fontSize: "13px", color: C.muted, marginTop: "4px" }}>
                 {myEntry.points_total} pts
-                {getNextRank(myEntry.points_total) && (
-                  <span style={{ color: C.dim }}> · {getNextRank(myEntry.points_total).min - myEntry.points_total} pts pour {getNextRank(myEntry.points_total).icon} {getNextRank(myEntry.points_total).name}</span>
+                {myRankData.next && (
+                  <span style={{ color: C.dim }}>
+                    {" "}· {myRankData.next.min - myEntry.points_total} pts pour {myRankData.next.name}
+                  </span>
                 )}
               </div>
             </div>
@@ -144,10 +124,8 @@ export default function Ranking({ user }) {
       {/* Player list */}
       {players.map((player, i) => {
         const pts = player.points_total
-        const rank = getRank(pts)
-        const next = getNextRank(pts)
-        const pct = next ? Math.round(((pts - rank.min) / (next.min - rank.min)) * 100) : 100
-        const pod = PODIUM[i]
+        const { pct, rank, next } = getRankProgress(pts)
+        const pod = PODIUM_STYLE[i]
         const isMe = player.id === user.id
 
         return (
@@ -162,12 +140,9 @@ export default function Ranking({ user }) {
               animationDelay: `${i * 0.04}s`,
             }}>
 
-            {/* Position */}
-            <div style={{ width: "28px", textAlign: "center", flexShrink: 0, paddingTop: "2px" }}>
-              {pod
-                ? <span style={{ fontSize: "20px" }}>{pod.medal}</span>
-                : <span style={{ color: C.dim, fontSize: "13px", fontWeight: "700" }}>{i + 1}</span>
-              }
+            {/* Position badge */}
+            <div style={{ flexShrink: 0, paddingTop: "6px" }}>
+              <PositionBadge position={i + 1} size={26} />
             </div>
 
             <Avatar username={player.username} size={38} />
@@ -183,7 +158,7 @@ export default function Ranking({ user }) {
                     Moi
                   </span>
                 )}
-                <span style={{ fontSize: "12px" }}>{rank.icon}</span>
+                <RankShield rank={rank} size={20} />
                 <span style={{ fontSize: "10px", fontWeight: "700", color: rank.color }}>
                   {rank.name.toUpperCase()}
                 </span>
@@ -193,8 +168,8 @@ export default function Ranking({ user }) {
                 <ProgressBar pct={pct} color={rank.color} height={4} />
                 <div style={{ fontSize: "10px", color: C.dim, marginTop: "4px" }}>
                   {next
-                    ? `${pts} / ${next.min} pts pour ${next.icon} ${next.name}`
-                    : <span style={{ color: rank.color, fontWeight: "700" }}>Rang maximum 👑</span>
+                    ? `${pts} / ${next.min} pts pour ${next.name}`
+                    : <span style={{ color: rank.color, fontWeight: "700" }}>Rang maximum</span>
                   }
                 </div>
               </div>
@@ -202,7 +177,7 @@ export default function Ranking({ user }) {
 
             {/* Points */}
             <div style={{ textAlign: "right", flexShrink: 0 }}>
-              <div style={{ fontSize: "22px", fontWeight: "800", color: pod?.ptsColor ?? C.primary }}>
+              <div style={{ fontSize: "22px", fontWeight: "800", color: pod?.pts ?? C.primary }}>
                 {pts}
               </div>
               <div style={{ fontSize: "10px", color: C.dim, marginTop: "-2px" }}>pts</div>
