@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "./supabase"
 import Matches from "./pages/Matches"
 import Ranking from "./pages/Ranking"
 import League from "./pages/League"
+import Combined from "./pages/Combined"
 import { importMatches } from "./importMatches"
 
 const C = {
@@ -21,6 +22,7 @@ const inp = {
 export default function App() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("matches")
+  const [balance, setBalance] = useState(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [username, setUsername] = useState("")
@@ -29,11 +31,26 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setUser(session?.user ?? null))
-    supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user ?? null))
-    importMatches()
+  const fetchBalance = useCallback(async (uid) => {
+    const { data } = await supabase
+      .from("profiles").select("balance").eq("id", uid).single()
+    if (data) setBalance(data.balance ?? 1000)
   }, [])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) fetchBalance(u.id)
+    })
+    supabase.auth.onAuthStateChange((_e, session) => {
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) fetchBalance(u.id)
+      else { setBalance(null) }
+    })
+    importMatches()
+  }, [fetchBalance])
 
   async function handleSubmit() {
     setLoading(true); setError("")
@@ -43,7 +60,7 @@ export default function App() {
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username })
+      if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username, balance: 1000 })
     }
     setLoading(false)
   }
@@ -51,7 +68,14 @@ export default function App() {
   async function handleCalculatePoints() {
     const { data, error } = await supabase.functions.invoke("calculate-points")
     if (error) alert("Erreur : " + error.message)
-    else alert(`✅ ${data.matchesProcessed} matchs traités, ${data.usersUpdated} joueurs mis à jour`)
+    else {
+      alert(`✅ ${data.matchesProcessed} matchs traités, ${data.usersUpdated} joueurs mis à jour`)
+      if (user) fetchBalance(user.id)
+    }
+  }
+
+  function onBalanceChange() {
+    if (user) fetchBalance(user.id)
   }
 
   if (user) return (
@@ -60,19 +84,33 @@ export default function App() {
       {/* Header */}
       <div style={{
         background: `linear-gradient(135deg, ${C.primary} 0%, ${C.primaryDark} 100%)`,
-        padding: "16px 20px 14px",
+        padding: "12px 16px 10px",
         display: "flex", justifyContent: "space-between", alignItems: "center",
         position: "sticky", top: 0, zIndex: 20,
         boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
       }}>
+        {/* Left: logo + balance */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "24px" }}>⚽</span>
+          <span style={{ fontSize: "22px" }}>⚽</span>
           <div>
-            <div style={{ fontWeight: "800", fontSize: "16px", color: "white", letterSpacing: "-0.3px" }}>CdM Paris 2026</div>
-            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>Pronostics</div>
+            <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>CdM Paris 2026</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.7)" }}>Pronostics</span>
+              {balance !== null && (
+                <span style={{
+                  fontSize: "11px", fontWeight: "800", color: "white",
+                  background: "rgba(255,255,255,0.18)", borderRadius: "12px",
+                  padding: "1px 8px", letterSpacing: "0.2px",
+                }}>
+                  💰 {balance.toLocaleString("fr-FR")} pts
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+
+        {/* Right: actions */}
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           {user.email === "emmanuelfayard57@gmail.com" && (
             <button onClick={handleCalculatePoints} style={{
               padding: "6px 12px", borderRadius: "20px", cursor: "pointer",
@@ -90,9 +128,10 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches" && <Matches user={user} />}
-        {page === "ranking" && <Ranking user={user} />}
-        {page === "league"  && <League user={user} />}
+        {page === "matches"  && <Matches  user={user} balance={balance} onBalanceChange={onBalanceChange} />}
+        {page === "combined" && <Combined user={user} balance={balance} onBalanceChange={onBalanceChange} />}
+        {page === "ranking"  && <Ranking  user={user} />}
+        {page === "league"   && <League   user={user} />}
       </div>
 
       {/* Bottom nav */}
@@ -103,9 +142,10 @@ export default function App() {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}>
         {[
-          { id: "matches", icon: "⚽", label: "Matchs" },
-          { id: "ranking", icon: "🏆", label: "Classement" },
-          { id: "league",  icon: "🤝", label: "Ma Ligue" },
+          { id: "matches",  icon: "⚽", label: "Matchs"     },
+          { id: "combined", icon: "🎯", label: "Combiné"    },
+          { id: "ranking",  icon: "🏆", label: "Classement" },
+          { id: "league",   icon: "🤝", label: "Ma Ligue"   },
         ].map(tab => (
           <button key={tab.id} onClick={() => setPage(tab.id)} style={{
             flex: 1, display: "flex", flexDirection: "column",
@@ -114,10 +154,8 @@ export default function App() {
             color: page === tab.id ? C.primary : C.dim,
             transition: "color 0.2s",
           }}>
-            <span style={{ fontSize: "20px" }}>{tab.icon}</span>
-            <span style={{
-              fontSize: "11px", fontWeight: page === tab.id ? "600" : "400",
-            }}>{tab.label}</span>
+            <span style={{ fontSize: "18px" }}>{tab.icon}</span>
+            <span style={{ fontSize: "10px", fontWeight: page === tab.id ? "700" : "400" }}>{tab.label}</span>
           </button>
         ))}
       </div>

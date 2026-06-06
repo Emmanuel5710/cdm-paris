@@ -1,74 +1,89 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-}
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+)
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
-  }
+Deno.serve(async (_req) => {
+  try {
+    const { data: matches } = await supabase
+      .from("matches")
+      .select("id, home_score, away_score")
+      .eq("status", "finished")
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  )
+    let matchesProcessed = 0
+    const usersUpdated = new Set()
 
-  // 1. Tous les matchs terminés
-  const { data: matches, error: matchErr } = await supabase
-    .from("matches")
-    .select("id, home_score, away_score")
-    .eq("status", "finished")
+    for (const match of matches ?? []) {
+      const hs = Number(match.home_score)
+      const as_ = Number(match.away_score)
+      const result = hs > as_ ? "home" : as_ > hs ? "away" : "draw"
 
-  if (matchErr) return json({ error: matchErr.message }, 500)
-  if (!matches?.length) return json({ message: "Aucun match terminé", matchesProcessed: 0 })
+      const { data: bets } = await supabase
+        .from("bets")
+        .select("id, user_id, bet_value, stake")
+        .eq("match_id", match.id)
+        .eq("bet_type", "result")
+        .eq("processed", false)
 
-  // 2. Pour chaque match, marquer les paris corrects/incorrects (2 requêtes par match)
-  for (const match of matches) {
-    const result = match.home_score > match.away_score ? "home"
-      : match.away_score > match.home_score ? "away"
-      : "draw"
+      for (const bet of bets ?? []) {
+        const correct = bet.bet_value === result
+        const stake = bet.stake ?? 10
+        if (correct) {
+          await supabase.rpc("award_bet_win", { uid: bet.user_id, delta_balance: stake * 2 })
+        }
+        await supabase.from("bets").update({ processed: true }).eq("id", bet.id)
+        usersUpdated.add(bet.user_id)
+      }
+      matchesProcessed++
+    }
 
-    await Promise.all([
-      supabase.from("bets")
-        .update({ is_correct: true })
-        .eq("match_id", match.id).eq("bet_type", "result").eq("bet_value", result),
-      supabase.from("bets")
-        .update({ is_correct: false })
-        .eq("match_id", match.id).eq("bet_type", "result").neq("bet_value", result),
-    ])
-  }
+    const { data: pendingCombined } = await supabase
+      .from("combined_bets")
+      .select("*")
+      .eq("status", "pending")
 
-  // 3. Agréger les points par utilisateur (10 pts par pari correct)
-  const { data: correctBets } = await supabase
-    .from("bets")
-    .select("user_id")
-    .eq("is_correct", true)
+    for (const cb of pendingCombined ?? []) {
+      const matchIds = cb.match_ids
+      const predictions = cb.predictions
 
-  const pointsMap: Record<string, number> = {}
-  for (const bet of correctBets ?? []) {
-    pointsMap[bet.user_id] = (pointsMap[bet.user_id] ?? 0) + 10
-  }
+      const { data: cbMatches } = await supabase
+        .from("matches")
+        .select("id, home_score, away_score, status")
+        .in("id", matchIds)
 
-  // 4. Mettre à jour points_total dans profiles
-  await Promise.all(
-    Object.entries(pointsMap).map(([userId, points]) =>
-      supabase.from("profiles").update({ points_total: points }).eq("id", userId)
+      if (!cbMatches || cbMatches.length < matchIds.length) continue
+      if (!cbMatches.every((m) => m.status === "finished")) continue
+
+      let allCorrect = true
+      for (const m of cbMatches) {
+        const hs = Number(m.home_score)
+        const as_ = Number(m.away_score)
+        const result = hs > as_ ? "home" : as_ > hs ? "away" : "draw"
+        if (predictions[String(m.id)] !== result) { allCorrect = false; break }
+      }
+
+      if (allCorrect) {
+        await supabase.rpc("adjust_balance", { uid: cb.user_id, delta: cb.stake * cb.multiplier })
+      }
+
+      await supabase
+        .from("combined_bets")
+        .update({ status: allCorrect ? "won" : "lost" })
+        .eq("id", cb.id)
+
+      usersUpdated.add(cb.user_id)
+    }
+
+    return new Response(
+      JSON.stringify({ matchesProcessed, usersUpdated: usersUpdated.size }),
+      { headers: { "Content-Type": "application/json" } }
     )
-  )
-
-  return json({
-    message: "Points calculés avec succès",
-    matchesProcessed: matches.length,
-    usersUpdated: Object.keys(pointsMap).length,
-    pointsMap,
-  })
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: String(err) }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    )
+  }
 })
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  })
-}
