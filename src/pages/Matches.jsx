@@ -6,7 +6,7 @@ const C = {
   bg: "#0F1923", card: "#1A2634", border: "#243447",
   primary: "#1D9E75", primaryGlow: "rgba(29,158,117,0.18)",
   text: "#f1f5f9", muted: "#94a3b8", dim: "#64748b",
-  inner: "#0d1720",
+  inner: "#0d1720", cancel: "#ef444433", cancelText: "#f87171",
 }
 
 const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "possession_home", "scorer"]
@@ -48,7 +48,7 @@ function FormDots({ form }) {
 
 // ─── Shared advanced bet card ─────────────────────────────────────────────────
 
-function BetCard({ icon, title, hasBet, children }) {
+function BetCard({ icon, title, hasBet, onCancel, children }) {
   return (
     <div style={{
       background: C.inner, borderRadius: "12px", padding: "14px",
@@ -61,9 +61,19 @@ function BetCard({ icon, title, hasBet, children }) {
           <span style={{ fontSize: "11px", color: hasBet ? C.primary : C.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px" }}>{title}</span>
         </div>
         {hasBet && (
-          <span style={{ fontSize: "9px", background: C.primaryGlow, color: C.primary, borderRadius: "20px", padding: "3px 8px", fontWeight: "700", border: `1px solid ${C.primary}33` }}>
-            Parié ✓
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "9px", background: C.primaryGlow, color: C.primary, borderRadius: "20px", padding: "3px 8px", fontWeight: "700", border: `1px solid ${C.primary}33` }}>
+              Parié ✓
+            </span>
+            {onCancel && (
+              <button onClick={onCancel} title="Annuler ce pari" style={{
+                width: "22px", height: "22px", borderRadius: "50%", border: `1px solid ${C.cancelText}44`,
+                background: C.cancel, cursor: "pointer", color: C.cancelText,
+                fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, transition: "all 0.15s", padding: 0,
+              }}>✕</button>
+            )}
+          </div>
         )}
       </div>
       {children}
@@ -103,11 +113,11 @@ function Stepper({ value, min, max, display, onChange }) {
 
 // ─── Goals bet ────────────────────────────────────────────────────────────────
 
-function GoalsBet({ saved, onSave }) {
+function GoalsBet({ saved, onSave, onCancel }) {
   const val = saved != null ? parseInt(saved) : null
   const fmt = n => n === 1 ? "1 but" : `${n} buts`
   return (
-    <BetCard icon="⚽" title="Buts dans le match" hasBet={val != null}>
+    <BetCard icon="⚽" title="Buts dans le match" hasBet={val != null} onCancel={val != null ? onCancel : null}>
       <p style={{ fontSize: "12px", color: C.dim, marginBottom: "13px" }}>
         Je parie qu'il y aura exactement{" "}
         <strong style={{ color: val != null ? C.primary : C.muted }}>{val != null ? fmt(val) : "… buts"}</strong>
@@ -119,10 +129,10 @@ function GoalsBet({ saved, onSave }) {
 
 // ─── Corners bet ──────────────────────────────────────────────────────────────
 
-function CornersBet({ saved, onSave }) {
+function CornersBet({ saved, onSave, onCancel }) {
   const val = saved != null ? parseInt(saved) : null
   return (
-    <BetCard icon="🚩" title="Corners" hasBet={val != null}>
+    <BetCard icon="🚩" title="Corners" hasBet={val != null} onCancel={val != null ? onCancel : null}>
       <p style={{ fontSize: "12px", color: C.dim, marginBottom: "13px" }}>
         Je parie qu'il y aura plus de{" "}
         <strong style={{ color: val != null ? C.primary : C.muted }}>{val != null ? `${val} corners` : "… corners"}</strong>
@@ -134,7 +144,7 @@ function CornersBet({ saved, onSave }) {
 
 // ─── Red card bet ─────────────────────────────────────────────────────────────
 
-function RedCardBet({ saved, onSave, homeName, awayName }) {
+function RedCardBet({ saved, onSave, onCancel, homeName, awayName }) {
   const opts = [
     { value: "none", label: "Aucun", sub: "Pas de carton rouge" },
     { value: "home", label: homeName, sub: "Équipe domicile" },
@@ -142,7 +152,7 @@ function RedCardBet({ saved, onSave, homeName, awayName }) {
     { value: "both", label: "Les deux", sub: "Les deux équipes" },
   ]
   return (
-    <BetCard icon="🟥" title="Carton rouge" hasBet={!!saved}>
+    <BetCard icon="🟥" title="Carton rouge" hasBet={!!saved} onCancel={saved ? onCancel : null}>
       <p style={{ fontSize: "12px", color: C.dim, marginBottom: "11px" }}>Quelle équipe prendra un carton rouge ?</p>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px" }}>
         {opts.map(opt => {
@@ -171,15 +181,15 @@ function RedCardBet({ saved, onSave, homeName, awayName }) {
 
 // ─── Possession bet ───────────────────────────────────────────────────────────
 
-function PossessionBet({ saved, onSave, homeName, awayName }) {
+function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
   const savedNum = saved != null ? parseInt(saved) : null
   const [draft, setDraft] = useState(savedNum ?? 50)
 
-  useEffect(() => { if (savedNum != null) setDraft(savedNum) }, [savedNum])
+  useEffect(() => { setDraft(savedNum ?? 50) }, [savedNum])
 
   const awayPct = 100 - draft
   return (
-    <BetCard icon="📊" title="Possession domicile" hasBet={savedNum != null}>
+    <BetCard icon="📊" title="Possession domicile" hasBet={savedNum != null} onCancel={savedNum != null ? onCancel : null}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "10px" }}>
         <div style={{ textAlign: "left" }}>
           <div style={{ fontSize: "10px", color: C.dim, marginBottom: "2px" }} translate="no">{homeName}</div>
@@ -191,7 +201,6 @@ function PossessionBet({ saved, onSave, homeName, awayName }) {
           <div style={{ fontSize: "26px", fontWeight: "800", color: C.muted }}>{awayPct}%</div>
         </div>
       </div>
-      {/* Slider */}
       <div style={{ position: "relative" }}>
         <div style={{
           position: "absolute", top: "50%", left: 0, right: 0, height: "4px",
@@ -216,16 +225,15 @@ function PossessionBet({ saved, onSave, homeName, awayName }) {
 
 // ─── Scorer bet ───────────────────────────────────────────────────────────────
 
-function ScorerBet({ saved, onSave }) {
+function ScorerBet({ saved, onSave, onCancel }) {
   const [draft, setDraft] = useState(saved ?? "")
   useEffect(() => { setDraft(saved ?? "") }, [saved])
 
   function commit() { if (draft.trim()) onSave(draft.trim()) }
-
   const isDirty = draft.trim() !== (saved ?? "") && draft.trim().length > 0
 
   return (
-    <BetCard icon="🎯" title="Buteur du match" hasBet={!!saved}>
+    <BetCard icon="🎯" title="Buteur du match" hasBet={!!saved} onCancel={saved ? onCancel : null}>
       <p style={{ fontSize: "12px", color: C.dim, marginBottom: "10px" }}>
         Je parie que ce joueur marquera
       </p>
@@ -238,8 +246,7 @@ function ScorerBet({ saved, onSave }) {
           style={{
             flex: 1, background: "#1a2634", border: `1.5px solid ${draft ? C.primary : C.border}`,
             borderRadius: "9px", padding: "10px 13px", color: C.text, fontSize: "13px",
-            outline: "none", transition: "border-color 0.15s",
-            fontFamily: "inherit",
+            outline: "none", transition: "border-color 0.15s", fontFamily: "inherit",
           }}
         />
         {isDirty && (
@@ -267,7 +274,7 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
   const redCardLabel = { none: "Aucun carton rouge", home: homeName, away: awayName, both: "Les deux équipes" }
 
   const items = [
-    goals != null && { icon: "⚽", text: `Exactement ${goals == "1" ? "1 but" : `${goals} buts`}` },
+    goals != null && { icon: "⚽", text: `Exactement ${goals === "1" ? "1 but" : `${goals} buts`}` },
     corners != null && { icon: "🚩", text: `Plus de ${corners} corners` },
     redCard && { icon: "🟥", text: redCardLabel[redCard] ?? redCard },
     possession != null && { icon: "📊", text: `${homeName} ${possession}% — ${awayName} ${100 - parseInt(possession)}%` },
@@ -349,6 +356,20 @@ export default function Matches({ user }) {
     setBets(prev => ({ ...prev, [`${id}-${betType}`]: betValue }))
   }
 
+  async function cancelBet(matchId, betType) {
+    if (!user) return
+    const id = parseInt(matchId)
+    await supabase.from("bets").delete()
+      .eq("user_id", user.id)
+      .eq("match_id", id)
+      .eq("bet_type", betType)
+    setBets(prev => {
+      const next = { ...prev }
+      delete next[`${id}-${betType}`]
+      return next
+    })
+  }
+
   function toggleAdvanced(matchId) {
     setExpandedAdvanced(prev => {
       const next = new Set(prev)
@@ -397,6 +418,7 @@ export default function Matches({ user }) {
         const advancedCount = ADVANCED_TYPES.filter(t => bets[`${matchId}-${t}`] != null).length
 
         const save = (type, val) => placeBet(matchId, type, val)
+        const cancel = (type) => cancelBet(matchId, type)
 
         return (
           <div key={match.id}
@@ -480,6 +502,16 @@ export default function Matches({ user }) {
                     )
                   })}
                 </div>
+                {/* Cancel result bet */}
+                {myBet && (
+                  <div style={{ textAlign: "center", marginTop: "8px" }}>
+                    <button onClick={() => cancel("result")} style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: C.cancelText, fontSize: "11px", fontWeight: "600",
+                      padding: "2px 8px", opacity: 0.75,
+                    }}>✕ Annuler le pronostic</button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -518,26 +550,31 @@ export default function Matches({ user }) {
                     <GoalsBet
                       saved={bets[`${matchId}-exact_goals`]}
                       onSave={v => save("exact_goals", v)}
+                      onCancel={() => cancel("exact_goals")}
                     />
                     <CornersBet
                       saved={bets[`${matchId}-exact_corners`]}
                       onSave={v => save("exact_corners", v)}
+                      onCancel={() => cancel("exact_corners")}
                     />
                     <RedCardBet
                       saved={bets[`${matchId}-red_card_team`]}
                       onSave={v => save("red_card_team", v)}
+                      onCancel={() => cancel("red_card_team")}
                       homeName={match.home.name}
                       awayName={match.away.name}
                     />
                     <PossessionBet
                       saved={bets[`${matchId}-possession_home`]}
                       onSave={v => save("possession_home", v)}
+                      onCancel={() => cancel("possession_home")}
                       homeName={match.home.name}
                       awayName={match.away.name}
                     />
                     <ScorerBet
                       saved={bets[`${matchId}-scorer`]}
                       onSave={v => save("scorer", v)}
+                      onCancel={() => cancel("scorer")}
                     />
                   </div>
                 )}
