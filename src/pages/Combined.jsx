@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { supabase } from "../supabase"
+import { computeOddsMap, fmtOdds } from "../utils/odds"
 
 const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=200&dates=20260611-20260719"
 
@@ -11,11 +12,11 @@ const C = {
   win: "#1D9E75", winGlow: "rgba(29,158,117,0.12)",
   lose: "#ef4444", loseGlow: "rgba(239,68,68,0.10)",
   pending: "#f59e0b", pendingGlow: "rgba(245,158,11,0.10)",
+  odds: "#f59e0b",
 }
 
 // 2=×2, 3=×4, 4=×6, 5=×10, 6=×13, 7=×17, 8=×20, 9=×23, 10=×25
 const MULTS = [null, null, 2, 4, 6, 10, 13, 17, 20, 23, 25]
-
 function getMultiplier(n) { return MULTS[n] ?? null }
 
 function parseMatches(data) {
@@ -24,8 +25,7 @@ function parseMatches(data) {
     const home = comp?.competitors?.find(c => c.homeAway === "home")
     const away = comp?.competitors?.find(c => c.homeAway === "away")
     return {
-      id: ev.id,
-      date: ev.date,
+      id: ev.id, date: ev.date,
       state: comp?.status?.type?.state,
       statusDetail: comp?.status?.type?.shortDetail,
       home: { name: home?.team?.displayName ?? "", logo: home?.team?.logo ?? "" },
@@ -36,8 +36,7 @@ function parseMatches(data) {
 
 function fmtDate(iso) {
   if (!iso) return ""
-  const d = new Date(iso)
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
 }
 
 // ─── Multiplier table ─────────────────────────────────────────────────────────
@@ -46,8 +45,7 @@ function MultTable({ current }) {
   return (
     <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", justifyContent: "center" }}>
       {[2,3,4,5,6,7,8,9,10].map(n => {
-        const m = MULTS[n]
-        const active = n === current
+        const m = MULTS[n], active = n === current
         return (
           <div key={n} style={{
             display: "flex", flexDirection: "column", alignItems: "center",
@@ -71,76 +69,48 @@ function TicketCard({ ticket }) {
   const info = ticket.matches_info || {}
   const preds = ticket.predictions || {}
   const status = ticket.status
-
   const statusCfg = {
     won:     { color: C.win,     bg: C.winGlow,     border: `${C.win}33`,     icon: "✓", label: "Gagné"    },
     lost:    { color: C.lose,    bg: C.loseGlow,    border: `${C.lose}33`,    icon: "✕", label: "Perdu"    },
     pending: { color: C.pending, bg: C.pendingGlow, border: `${C.pending}33`, icon: "⏳", label: "En cours" },
   }[status] || {}
 
-  const matchEntries = Object.entries(preds)
-
   return (
     <div style={{
       background: statusCfg.bg ?? C.card, border: `1px solid ${statusCfg.border ?? C.border}`,
       borderRadius: "14px", padding: "14px 16px", marginBottom: "10px",
     }}>
-      {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{
-            background: `${statusCfg.color}22`, color: statusCfg.color,
-            borderRadius: "20px", padding: "3px 10px",
-            fontSize: "11px", fontWeight: "800",
-          }}>
+          <span style={{ background: `${statusCfg.color}22`, color: statusCfg.color, borderRadius: "20px", padding: "3px 10px", fontSize: "11px", fontWeight: "800" }}>
             {statusCfg.icon} {statusCfg.label}
           </span>
-          <span style={{
-            background: C.primaryGlow, color: C.primary,
-            borderRadius: "20px", padding: "3px 10px",
-            fontSize: "11px", fontWeight: "700", border: `1px solid ${C.primary}33`,
-          }}>
+          <span style={{ background: C.primaryGlow, color: C.primary, borderRadius: "20px", padding: "3px 10px", fontSize: "11px", fontWeight: "700", border: `1px solid ${C.primary}33` }}>
             ×{ticket.multiplier}
           </span>
         </div>
         <div style={{ textAlign: "right" }}>
-          {status === "won" && (
-            <div style={{ color: C.win, fontWeight: "800", fontSize: "15px" }}>+{ticket.stake * ticket.multiplier} pts</div>
-          )}
-          {status === "lost" && (
-            <div style={{ color: C.lose, fontWeight: "700", fontSize: "15px" }}>−{ticket.stake} pts</div>
-          )}
+          {status === "won"     && <div style={{ color: C.win,     fontWeight: "800", fontSize: "15px" }}>+{ticket.stake * ticket.multiplier} pts</div>}
+          {status === "lost"    && <div style={{ color: C.lose,    fontWeight: "700", fontSize: "15px" }}>−{ticket.stake} pts</div>}
           {status === "pending" && (
-            <div style={{ color: C.pending, fontWeight: "700", fontSize: "13px" }}>Mise : {ticket.stake} pts</div>
-          )}
-          {status === "pending" && (
-            <div style={{ color: C.dim, fontSize: "10px", marginTop: "2px" }}>
-              Gain potentiel : {ticket.stake * ticket.multiplier} pts
-            </div>
+            <>
+              <div style={{ color: C.pending, fontWeight: "700", fontSize: "13px" }}>Mise : {ticket.stake} pts</div>
+              <div style={{ color: C.dim, fontSize: "10px", marginTop: "2px" }}>Gain potentiel : {ticket.stake * ticket.multiplier} pts</div>
+            </>
           )}
         </div>
       </div>
 
-      {/* Match predictions */}
       <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-        {matchEntries.map(([matchId, pred]) => {
+        {Object.entries(preds).map(([matchId, pred]) => {
           const matchInfo = info[matchId] || {}
-          const predLabel = pred === "home" ? matchInfo.home
-                          : pred === "away" ? matchInfo.away
-                          : "Match nul"
+          const predLabel = pred === "home" ? matchInfo.home : pred === "away" ? matchInfo.away : "Match nul"
           return (
-            <div key={matchId} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "6px 10px", borderRadius: "8px", background: C.inner,
-            }}>
+            <div key={matchId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", borderRadius: "8px", background: C.inner }}>
               <span translate="no" style={{ fontSize: "12px", color: C.muted, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: "8px" }}>
                 {matchInfo.home || "?"} <span style={{ color: C.dim }}>vs</span> {matchInfo.away || "?"}
               </span>
-              <span translate="no" style={{
-                fontSize: "11px", fontWeight: "700", color: C.primary,
-                background: C.primaryGlow, borderRadius: "20px", padding: "2px 8px",
-                flexShrink: 0,
-              }}>
+              <span translate="no" style={{ fontSize: "11px", fontWeight: "700", color: C.primary, background: C.primaryGlow, borderRadius: "20px", padding: "2px 8px", flexShrink: 0 }}>
                 {predLabel || pred}
               </span>
             </div>
@@ -149,9 +119,7 @@ function TicketCard({ ticket }) {
       </div>
 
       <div style={{ fontSize: "10px", color: C.dim, marginTop: "8px" }}>
-        {new Date(ticket.created_at).toLocaleDateString("fr-FR", {
-          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
-        })}
+        {new Date(ticket.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
       </div>
     </div>
   )
@@ -160,17 +128,14 @@ function TicketCard({ ticket }) {
 // ─── Stake input ──────────────────────────────────────────────────────────────
 
 function StakeInput({ value, onChange, min, max, label }) {
-  function step(delta) {
-    const next = Math.max(min, Math.min(max, value + delta))
-    onChange(next)
-  }
+  function step(delta) { onChange(Math.max(min, Math.min(max, value + delta))) }
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
       <span style={{ fontSize: "12px", color: C.muted, fontWeight: "600", minWidth: "40px" }}>{label}</span>
-      <button onClick={() => step(-50)} disabled={value <= min} style={stepBtn(value > min)}>−50</button>
-      <button onClick={() => step(-10)} disabled={value <= min} style={stepBtn(value > min)}>−10</button>
-      <input
-        type="number" value={value} min={min} max={max}
+      {[-50, -10].map(d => (
+        <button key={d} onClick={() => step(d)} disabled={value <= min} style={stepBtn(value > min)}>{d}</button>
+      ))}
+      <input type="number" value={value} min={min} max={max}
         onChange={e => { const n = parseInt(e.target.value); if (!isNaN(n)) onChange(Math.max(min, Math.min(max, n))) }}
         style={{
           width: "70px", background: C.inner, border: `1.5px solid ${C.primary}`,
@@ -178,8 +143,9 @@ function StakeInput({ value, onChange, min, max, label }) {
           fontWeight: "800", outline: "none", textAlign: "center", fontFamily: "inherit",
         }}
       />
-      <button onClick={() => step(+10)} disabled={value >= max} style={stepBtn(value < max)}>+10</button>
-      <button onClick={() => step(+50)} disabled={value >= max} style={stepBtn(value < max)}>+50</button>
+      {[10, 50].map(d => (
+        <button key={d} onClick={() => step(d)} disabled={value >= max} style={stepBtn(value < max)}>+{d}</button>
+      ))}
       <span style={{ fontSize: "12px", color: C.dim }}>pts</span>
     </div>
   )
@@ -204,10 +170,26 @@ export default function Combined({ user, balance, onBalanceChange }) {
   const [preds, setPreds] = useState({})
   const [stake, setStake] = useState(50)
   const [tickets, setTickets] = useState([])
+  const [oddsMap, setOddsMap] = useState({})   // { matchId: { home, draw, away } }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { fetchData() }, [])
+
+  // Live odds: all result bets + Realtime + 30s polling
+  useEffect(() => {
+    fetchAllResultBets()
+    const ch = supabase.channel("combined-odds")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bets" }, fetchAllResultBets)
+      .subscribe()
+    const iv = setInterval(fetchAllResultBets, 30000)
+    return () => { supabase.removeChannel(ch); clearInterval(iv) }
+  }, [])
+
+  async function fetchAllResultBets() {
+    const { data } = await supabase.from("bets").select("match_id, bet_value, stake").eq("bet_type", "result")
+    if (data) setOddsMap(computeOddsMap(data))
+  }
 
   async function fetchData() {
     const [, { data: ticketData }] = await Promise.all([
@@ -220,15 +202,13 @@ export default function Combined({ user, balance, onBalanceChange }) {
   async function fetchMatches() {
     try {
       const res = await fetch(ESPN_URL)
-      const data = await res.json()
-      setMatches(parseMatches(data).filter(m => m.state === "pre"))
+      setMatches(parseMatches(await res.json()).filter(m => m.state === "pre"))
     } catch {}
     setLoading(false)
   }
 
   async function refreshTickets() {
-    const { data } = await supabase
-      .from("combined_bets").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
+    const { data } = await supabase.from("combined_bets").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
     setTickets(data || [])
   }
 
@@ -259,10 +239,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
 
   async function validate() {
     if (!allPredicted || saving || !mult) return
-    if (cappedStake > safeBalance) {
-      alert("Solde insuffisant pour cette mise.")
-      return
-    }
+    if (cappedStake > safeBalance) { alert("Solde insuffisant pour cette mise."); return }
 
     setSaving(true)
 
@@ -278,29 +255,17 @@ export default function Combined({ user, balance, onBalanceChange }) {
     }
 
     const { error } = await supabase.from("combined_bets").insert({
-      user_id: user.id,
-      match_ids: matchIds,
-      predictions: predsToSave,
-      matches_info: matchesInfo,
-      multiplier: mult,
-      stake: cappedStake,
-      status: "pending",
+      user_id: user.id, match_ids: matchIds, predictions: predsToSave,
+      matches_info: matchesInfo, multiplier: mult, stake: cappedStake, status: "pending",
     })
 
-    if (error) {
-      alert("Erreur : " + error.message)
-      setSaving(false)
-      return
-    }
+    if (error) { alert("Erreur : " + error.message); setSaving(false); return }
 
-    // Deduct stake immediately from balance
     await supabase.rpc("adjust_balance", { uid: user.id, delta: -cappedStake })
     onBalanceChange?.()
 
-    setSelected(new Set())
-    setPreds({})
-    setView("tickets")
-    refreshTickets()
+    setSelected(new Set()); setPreds({})
+    setView("tickets"); refreshTickets()
     setSaving(false)
   }
 
@@ -313,30 +278,23 @@ export default function Combined({ user, balance, onBalanceChange }) {
     <div style={{ maxWidth: "600px", margin: "0 auto" }}>
 
       {/* View switcher */}
-      <div style={{
-        display: "flex", background: "#0a1520", borderBottom: `1px solid ${C.border}`,
-        position: "sticky", top: 0, zIndex: 10,
-      }}>
+      <div style={{ display: "flex", background: "#0a1520", borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10 }}>
         {[
           { id: "create",  label: "Créer un combiné", badge: null },
           { id: "tickets", label: "Mes tickets", badge: tickets.length || null },
         ].map(tab => (
           <button key={tab.id} onClick={() => setView(tab.id)} style={{
-            flex: 1, padding: "14px 8px",
-            background: "none", border: "none", cursor: "pointer",
+            flex: 1, padding: "14px 8px", background: "none", border: "none", cursor: "pointer",
             color: view === tab.id ? C.primary : C.muted,
-            fontWeight: view === tab.id ? "700" : "500",
-            fontSize: "13px",
+            fontWeight: view === tab.id ? "700" : "500", fontSize: "13px",
             borderBottom: `2px solid ${view === tab.id ? C.primary : "transparent"}`,
             display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
           }}>
             {tab.label}
             {tab.badge !== null && (
-              <span style={{
-                background: C.primaryGlow, color: C.primary, borderRadius: "20px",
-                padding: "1px 7px", fontSize: "10px", fontWeight: "700",
-                border: `1px solid ${C.primary}33`,
-              }}>{tab.badge}</span>
+              <span style={{ background: C.primaryGlow, color: C.primary, borderRadius: "20px", padding: "1px 7px", fontSize: "10px", fontWeight: "700", border: `1px solid ${C.primary}33` }}>
+                {tab.badge}
+              </span>
             )}
           </button>
         ))}
@@ -349,11 +307,11 @@ export default function Combined({ user, balance, onBalanceChange }) {
           {/* Multiplier table */}
           <div style={{ background: C.card, borderRadius: "14px", padding: "14px 16px", marginBottom: "16px", border: `1px solid ${C.border}` }}>
             <div style={{ fontSize: "11px", color: C.dim, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>
-              Multiplicateurs
+              Multiplicateurs de gain
             </div>
             <MultTable current={selCount >= 2 ? selCount : null} />
             <div style={{ fontSize: "11px", color: C.dim, textAlign: "center", marginTop: "10px" }}>
-              Sélectionne 2 à 10 matchs pour activer ton combiné
+              Sélectionne 2 à 10 matchs · Cotes ESPN affichées en temps réel
             </div>
           </div>
 
@@ -370,14 +328,14 @@ export default function Combined({ user, balance, onBalanceChange }) {
             const isSel = selected.has(sid)
             const pred = preds[sid]
             const maxSel = selected.size >= 10 && !isSel
+            const matchOdds = oddsMap[parseInt(match.id)] ?? {}
 
             return (
               <div key={match.id} style={{
                 background: isSel ? `linear-gradient(135deg, rgba(29,158,117,0.1), rgba(29,158,117,0.03))` : C.card,
                 border: `1px solid ${isSel ? `${C.primary}55` : C.border}`,
                 borderRadius: "12px", marginBottom: "8px",
-                opacity: maxSel ? 0.5 : 1,
-                transition: "all 0.15s",
+                opacity: maxSel ? 0.5 : 1, transition: "all 0.15s",
               }}>
                 {/* Match row */}
                 <div style={{
@@ -391,9 +349,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
                     background: isSel ? C.primary : "transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "12px", color: "white", fontWeight: "700", transition: "all 0.15s",
-                  }}>
-                    {isSel ? "✓" : ""}
-                  </div>
+                  }}>{isSel ? "✓" : ""}</div>
 
                   {/* Teams */}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -411,7 +367,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
                     <div style={{ fontSize: "10px", color: C.dim, marginTop: "2px" }}>{fmtDate(match.date)}</div>
                   </div>
 
-                  {/* Current prediction indicator */}
+                  {/* Prediction indicator */}
                   {pred && (
                     <span translate="no" style={{
                       fontSize: "10px", fontWeight: "700", color: C.primary,
@@ -423,7 +379,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
                   )}
                 </div>
 
-                {/* Prediction buttons — only when selected */}
+                {/* Prediction buttons with odds — only when selected */}
                 {isSel && (
                   <div style={{ padding: "0 14px 12px", display: "flex", gap: "6px" }}>
                     {[
@@ -432,17 +388,28 @@ export default function Combined({ user, balance, onBalanceChange }) {
                       { value: "away", label: match.away.name },
                     ].map(opt => {
                       const sel = pred === opt.value
+                      const oddsVal = matchOdds[opt.value]
                       return (
                         <button key={opt.value} onClick={e => { e.stopPropagation(); setPred(match.id, opt.value) }} style={{
                           flex: 1, padding: "8px 4px",
                           border: `1.5px solid ${sel ? C.primary : C.border}`,
-                          borderRadius: "30px", cursor: "pointer",
-                          background: sel ? C.primaryGlow : "transparent",
-                          color: sel ? C.primary : C.muted,
-                          fontSize: "10px", fontWeight: sel ? "700" : "500",
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          transition: "all 0.15s",
-                        }}>{opt.label}</button>
+                          borderRadius: "10px", cursor: "pointer",
+                          background: sel ? C.primaryGlow : C.inner,
+                          textAlign: "center", transition: "all 0.15s",
+                        }}>
+                          <div style={{
+                            fontSize: "10px", fontWeight: "600",
+                            color: sel ? C.primary : C.muted,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }} translate="no">{opt.label}</div>
+                          <div style={{
+                            fontSize: "13px", fontWeight: "800",
+                            color: sel ? C.primary : (oddsVal ? C.odds : C.dim),
+                            marginTop: "3px",
+                          }}>
+                            {fmtOdds(oddsVal)}
+                          </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -460,7 +427,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
             <div style={{ textAlign: "center", padding: "3rem 1rem", color: C.muted }}>
               <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎯</div>
               <p style={{ fontWeight: "600", color: C.text }}>Aucun ticket pour l'instant</p>
-              <p style={{ fontSize: "13px", marginTop: "6px" }}>Crée ton premier combiné dans l'onglet "Créer"</p>
+              <p style={{ fontSize: "13px", marginTop: "6px" }}>Crée ton premier combiné</p>
               <button onClick={() => setView("create")} style={{
                 marginTop: "20px", padding: "10px 24px", borderRadius: "30px",
                 background: C.primaryGlow, border: `1px solid ${C.primary}`, color: C.primary,
@@ -490,7 +457,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
         </div>
       )}
 
-      {/* ── Sticky bottom action bar — shown when 2+ matches selected ── */}
+      {/* ── Bottom action bar — 2+ matches selected ── */}
       {view === "create" && selCount >= 2 && (
         <div style={{
           position: "fixed", bottom: "64px", left: 0, right: 0, zIndex: 15,
@@ -498,7 +465,6 @@ export default function Combined({ user, balance, onBalanceChange }) {
           padding: "12px 16px",
           boxShadow: "0 -4px 24px rgba(0,0,0,0.5)",
         }}>
-          {/* Summary row */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
             <div>
               <span style={{ fontSize: "13px", color: C.text, fontWeight: "700" }}>
@@ -506,52 +472,40 @@ export default function Combined({ user, balance, onBalanceChange }) {
               </span>
               {mult && (
                 <span style={{
-                  marginLeft: "8px", fontSize: "13px", fontWeight: "800",
-                  color: C.primary, background: C.primaryGlow,
-                  borderRadius: "20px", padding: "2px 10px",
+                  marginLeft: "8px", fontSize: "13px", fontWeight: "800", color: C.primary,
+                  background: C.primaryGlow, borderRadius: "20px", padding: "2px 10px",
                   border: `1px solid ${C.primary}33`,
                 }}>×{mult}</span>
               )}
               {!allPredicted && (
                 <div style={{ fontSize: "10px", color: C.pending, marginTop: "2px" }}>
-                  Pronostic manquant sur {selCount - [...selected].filter(id => preds[id]).length} match{selCount - [...selected].filter(id => preds[id]).length > 1 ? "s" : ""}
+                  {selCount - [...selected].filter(id => preds[id]).length} pronostic(s) manquant(s)
                 </div>
               )}
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "12px", color: C.dim }}>Gain potentiel</div>
+              <div style={{ fontSize: "11px", color: C.dim }}>Gain si tout correct</div>
               <div style={{ fontSize: "20px", fontWeight: "800", color: C.primary }}>{potentialGain} pts</div>
             </div>
           </div>
 
-          {/* Stake input + validate */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <StakeInput
-                value={stake}
-                onChange={v => setStake(v)}
-                min={10}
-                max={safeBalance}
-                label="Mise :"
-              />
+              <StakeInput value={stake} onChange={v => setStake(v)} min={10} max={safeBalance} label="Mise :" />
               <div style={{ fontSize: "10px", color: C.dim, marginTop: "4px", paddingLeft: "40px" }}>
                 Solde : {safeBalance.toLocaleString("fr-FR")} pts · max {safeBalance} pts
               </div>
             </div>
-            <button
-              onClick={validate}
-              disabled={!allPredicted || saving}
-              style={{
-                padding: "12px 18px", borderRadius: "30px", border: "none", cursor: allPredicted && !saving ? "pointer" : "not-allowed",
-                background: allPredicted && !saving
-                  ? `linear-gradient(135deg, ${C.primary}, #166d52)`
-                  : C.border,
-                color: allPredicted && !saving ? "white" : C.dim,
-                fontSize: "13px", fontWeight: "800", flexShrink: 0,
-                boxShadow: allPredicted ? "0 4px 16px rgba(29,158,117,0.35)" : "none",
-                transition: "all 0.2s",
-              }}
-            >
+            <button onClick={validate} disabled={!allPredicted || saving} style={{
+              padding: "12px 18px", borderRadius: "30px", border: "none",
+              cursor: allPredicted && !saving ? "pointer" : "not-allowed",
+              background: allPredicted && !saving
+                ? `linear-gradient(135deg, ${C.primary}, #166d52)` : C.border,
+              color: allPredicted && !saving ? "white" : C.dim,
+              fontSize: "13px", fontWeight: "800", flexShrink: 0,
+              boxShadow: allPredicted ? "0 4px 16px rgba(29,158,117,0.35)" : "none",
+              transition: "all 0.2s",
+            }}>
               {saving ? "Validation..." : "Valider ✓"}
             </button>
           </div>

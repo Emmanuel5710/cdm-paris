@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
+import { computeOddsMap, fmtOdds } from "../utils/odds"
 
 const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=200&dates=20260611-20260719"
 const C = {
@@ -7,10 +8,10 @@ const C = {
   primary: "#1D9E75", primaryGlow: "rgba(29,158,117,0.18)",
   text: "#f1f5f9", muted: "#94a3b8", dim: "#64748b",
   inner: "#0d1720", cancel: "#ef444433", cancelText: "#f87171",
+  odds: "#f59e0b",
 }
 
 const DEFAULT_STAKE = 50
-// scorer_N types are dynamic — not listed here
 const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "yellow_card_team", "possession_home"]
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -146,8 +147,6 @@ function Stepper({ value, min, max, display, onChange }) {
   )
 }
 
-// ─── Goals bet ────────────────────────────────────────────────────────────────
-
 function GoalsBet({ saved, onSave, onCancel }) {
   const val = saved != null ? parseInt(saved) : null
   const fmt = n => n === 1 ? "1 but" : `${n} buts`
@@ -162,12 +161,9 @@ function GoalsBet({ saved, onSave, onCancel }) {
   )
 }
 
-// ─── Corners bet — input numérique libre min=0 max=30 ─────────────────────────
-
 function CornersBet({ saved, onSave, onCancel }) {
   const savedNum = saved != null ? parseInt(saved) : null
   const [draft, setDraft] = useState(savedNum != null ? String(savedNum) : "")
-
   useEffect(() => { setDraft(savedNum != null ? String(savedNum) : "") }, [savedNum])
 
   function commit(raw) {
@@ -184,8 +180,7 @@ function CornersBet({ saved, onSave, onCancel }) {
         </strong>
       </p>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "14px" }}>
-        <input
-          type="number" min={0} max={30} value={draft}
+        <input type="number" min={0} max={30} value={draft}
           onChange={e => setDraft(e.target.value)}
           onBlur={e => commit(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") { commit(e.target.value); e.target.blur() } }}
@@ -202,8 +197,6 @@ function CornersBet({ saved, onSave, onCancel }) {
     </BetCard>
   )
 }
-
-// ─── Card bet (shared layout for red & yellow) ────────────────────────────────
 
 function CardBet({ icon, title, betType, saved, onSave, onCancel, homeName, awayName }) {
   const opts = [
@@ -229,11 +222,8 @@ function CardBet({ icon, title, betType, saved, onSave, onCancel, homeName, away
               fontSize: "11px", fontWeight: sel ? "700" : "500",
               textAlign: "center", transition: "all 0.15s", minWidth: 0,
             }}>
-              <div style={{ fontSize: "11px", fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                translate="no">{opt.label}</div>
-              {opt.sub !== opt.label && (
-                <div style={{ fontSize: "10px", color: sel ? C.primary + "bb" : C.dim, marginTop: "2px" }}>{opt.sub}</div>
-              )}
+              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} translate="no">{opt.label}</div>
+              {opt.sub !== opt.label && <div style={{ fontSize: "10px", color: sel ? C.primary + "bb" : C.dim, marginTop: "2px" }}>{opt.sub}</div>}
             </button>
           )
         })}
@@ -242,12 +232,9 @@ function CardBet({ icon, title, betType, saved, onSave, onCancel, homeName, away
   )
 }
 
-// ─── Possession bet — slider 1–99% step 1 ────────────────────────────────────
-
 function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
   const savedNum = saved != null ? parseInt(saved) : null
   const [draft, setDraft] = useState(savedNum ?? 50)
-
   useEffect(() => { setDraft(savedNum ?? 50) }, [savedNum])
 
   const awayPct = 100 - draft
@@ -288,18 +275,13 @@ function PossessionBet({ saved, onSave, onCancel, homeName, awayName }) {
   )
 }
 
-// ─── Multi-scorer bet ─────────────────────────────────────────────────────────
-
 function ScorersBet({ savedScorers, onSave, onCancel }) {
   const savedNums = Object.keys(savedScorers)
-    .map(k => parseInt(k.replace("scorer_", "")))
-    .filter(n => !isNaN(n))
-    .sort((a, b) => a - b)
-
+    .map(k => parseInt(k.replace("scorer_", ""))).filter(n => !isNaN(n)).sort((a, b) => a - b)
   const [emptySlots, setEmptySlots] = useState([])
   const [drafts, setDrafts] = useState({})
-
   const savedScorersKey = JSON.stringify(savedScorers)
+
   useEffect(() => {
     setEmptySlots(prev => prev.filter(n => !savedScorers[`scorer_${n}`]))
   }, [savedScorersKey])
@@ -310,116 +292,76 @@ function ScorersBet({ savedScorers, onSave, onCancel }) {
   function addSlot() {
     if (allNums.length >= 5) return
     const maxN = Math.max(0, ...savedNums, ...emptySlots)
-    const nextN = maxN + 1
-    setEmptySlots(prev => [...prev, nextN])
-    setDrafts(prev => ({ ...prev, [nextN]: "" }))
+    setEmptySlots(prev => [...prev, maxN + 1])
+    setDrafts(prev => ({ ...prev, [maxN + 1]: "" }))
   }
-
-  function getDraft(n) {
-    if (n in drafts) return drafts[n]
-    return savedScorers[`scorer_${n}`] ?? ""
-  }
-
-  function updateDraft(n, val) {
-    setDrafts(prev => ({ ...prev, [n]: val }))
-  }
-
+  function getDraft(n) { return n in drafts ? drafts[n] : savedScorers[`scorer_${n}`] ?? "" }
   function commit(n) {
     const d = getDraft(n).trim()
-    if (d) {
-      onSave(`scorer_${n}`, d)
-      setDrafts(prev => { const next = { ...prev }; delete next[n]; return next })
-    }
+    if (d) { onSave(`scorer_${n}`, d); setDrafts(prev => { const next = { ...prev }; delete next[n]; return next }) }
   }
-
   function removeRow(n) {
     if (savedScorers[`scorer_${n}`]) onCancel(`scorer_${n}`)
     setEmptySlots(prev => prev.filter(x => x !== n))
     setDrafts(prev => { const next = { ...prev }; delete next[n]; return next })
   }
-
   function cancelAll() {
     savedNums.forEach(n => onCancel(`scorer_${n}`))
-    setEmptySlots([])
-    setDrafts({})
+    setEmptySlots([]); setDrafts({})
   }
-
-  const rowInputStyle = draft => ({
-    flex: 1, background: "#1a2634",
-    border: `1.5px solid ${draft ? C.primary : C.border}`,
+  const rowInputStyle = d => ({
+    flex: 1, background: "#1a2634", border: `1.5px solid ${d ? C.primary : C.border}`,
     borderRadius: "9px", padding: "9px 12px", color: C.text, fontSize: "13px",
     outline: "none", transition: "border-color 0.15s", fontFamily: "inherit",
   })
-
   const iconBtn = (color, bg) => ({
-    width: "36px", height: "36px", borderRadius: "8px",
-    border: `1.5px solid ${color}55`, background: bg,
-    cursor: "pointer", color,
-    fontSize: "13px", fontWeight: "700",
+    width: "36px", height: "36px", borderRadius: "8px", border: `1.5px solid ${color}55`,
+    background: bg, cursor: "pointer", color, fontSize: "13px", fontWeight: "700",
     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
   })
 
   return (
     <BetCard icon="🎯" title="Buteurs du match" hasBet={hasBet} onCancel={hasBet ? cancelAll : null}>
-      <p style={{ fontSize: "12px", color: C.dim, marginBottom: "10px" }}>
-        Je parie que ces joueurs marqueront
-      </p>
-
+      <p style={{ fontSize: "12px", color: C.dim, marginBottom: "10px" }}>Je parie que ces joueurs marqueront</p>
       {allNums.length === 0 && (
         <p style={{ fontSize: "12px", color: C.dim, fontStyle: "italic", marginBottom: "8px", textAlign: "center" }}>
           Aucun buteur — cliquez sur &quot;+ Ajouter&quot;
         </p>
       )}
-
       {allNums.map((n, i) => {
         const savedVal = savedScorers[`scorer_${n}`]
         const draft = getDraft(n)
         const isDirty = draft.trim() !== (savedVal ?? "") && draft.trim().length > 0
         return (
           <div key={n} style={{ display: "flex", gap: "7px", marginBottom: "7px", alignItems: "center" }}>
-            <input
-              type="text" value={draft}
-              onChange={e => updateDraft(n, e.target.value)}
+            <input type="text" value={draft}
+              onChange={e => setDrafts(p => ({ ...p, [n]: e.target.value }))}
               onBlur={() => commit(n)}
               onKeyDown={e => { if (e.key === "Enter") { commit(n); e.target.blur() } }}
-              placeholder={`Buteur ${i + 1}...`}
-              style={rowInputStyle(draft)}
-            />
-            {isDirty && (
-              <button onClick={() => commit(n)} style={iconBtn(C.primary, C.primaryGlow)}>✓</button>
-            )}
+              placeholder={`Buteur ${i + 1}...`} style={rowInputStyle(draft)} />
+            {isDirty && <button onClick={() => commit(n)} style={iconBtn(C.primary, C.primaryGlow)}>✓</button>}
             <button onClick={() => removeRow(n)} style={iconBtn(C.cancelText, C.cancel)}>✕</button>
           </div>
         )
       })}
-
       {allNums.length < 5 && (
         <button onClick={addSlot} style={{
           width: "100%", padding: "9px", marginTop: allNums.length ? "4px" : 0,
           border: `1.5px dashed ${C.border}`, borderRadius: "9px",
-          background: "none", cursor: "pointer", color: C.muted,
-          fontSize: "12px", fontWeight: "600",
+          background: "none", cursor: "pointer", color: C.muted, fontSize: "12px", fontWeight: "600",
         }}>+ Ajouter un buteur</button>
       )}
     </BetCard>
   )
 }
 
-// ─── Locked advanced bets summary ────────────────────────────────────────────
-
 function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
   const g = key => bets[`${matchId}-${key}`]
   const cardLabel = val => ({ none: "Aucun", home: homeName, away: awayName, both: "Les deux équipes" })[val] ?? val
   const scorerValues = Object.entries(bets)
-    .filter(([k]) => k.startsWith(`${matchId}-scorer_`))
-    .map(([, v]) => v).filter(Boolean)
-
-  const goals = g("exact_goals")
-  const corners = g("exact_corners")
-  const redCard = g("red_card_team")
-  const yellowCard = g("yellow_card_team")
-  const possession = g("possession_home")
-
+    .filter(([k]) => k.startsWith(`${matchId}-scorer_`)).map(([, v]) => v).filter(Boolean)
+  const goals = g("exact_goals"), corners = g("exact_corners")
+  const redCard = g("red_card_team"), yellowCard = g("yellow_card_team"), possession = g("possession_home")
   const items = [
     goals != null && { icon: "⚽", text: `Exactement ${goals === "1" ? "1 but" : `${goals} buts`}` },
     corners != null && { icon: "🚩", text: `Plus de ${corners} corners` },
@@ -428,14 +370,10 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
     possession != null && { icon: "📊", text: `${homeName} ${possession}% — ${awayName} ${100 - parseInt(possession)}%` },
     ...scorerValues.map(name => ({ icon: "🎯", text: name })),
   ].filter(Boolean)
-
   if (!items.length) return null
-
   return (
     <div style={{ marginTop: "8px", borderTop: `1px solid ${C.border}`, paddingTop: "10px" }}>
-      <p style={{ fontSize: "10px", color: C.dim, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>
-        Paris avancés
-      </p>
+      <p style={{ fontSize: "10px", color: C.dim, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "700" }}>Paris avancés</p>
       <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
         {items.map((item, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
@@ -453,8 +391,10 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 export default function Matches({ user, balance, onBalanceChange }) {
   const [matches, setMatches] = useState([])
   const [bets, setBets] = useState({})
-  const [draftStakes, setDraftStakes] = useState({})   // stakes not yet placed
-  const [savedStakes, setSavedStakes] = useState({})   // stakes from DB for placed result bets
+  const [draftStakes, setDraftStakes] = useState({})
+  const [savedStakes, setSavedStakes] = useState({})
+  const [savedOdds, setSavedOdds] = useState({})    // { matchId: odds at time of bet }
+  const [oddsMap, setOddsMap] = useState({})         // { matchId: { home, draw, away } } — live
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
@@ -462,26 +402,8 @@ export default function Matches({ user, balance, onBalanceChange }) {
 
   const safeBalance = balance ?? 1000
 
+  // ── ESPN matches ────────────────────────────────────────────────────────────
   useEffect(() => { fetchMatches().finally(() => setLoading(false)) }, [])
-
-  useEffect(() => {
-    if (!user) return
-    async function loadBets() {
-      const { data } = await supabase
-        .from("bets").select("match_id, bet_type, bet_value, stake").eq("user_id", user.id)
-      if (data) {
-        const map = {}
-        const stakes = {}
-        data.forEach(b => {
-          map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value
-          if (b.bet_type === "result") stakes[parseInt(b.match_id)] = b.stake ?? DEFAULT_STAKE
-        })
-        setBets(map)
-        setSavedStakes(stakes)
-      }
-    }
-    loadBets()
-  }, [user])
 
   useEffect(() => {
     clearInterval(intervalRef.current)
@@ -499,19 +421,56 @@ export default function Matches({ user, balance, onBalanceChange }) {
     } catch { setError("Impossible de charger les matchs ESPN.") }
   }
 
-  function getStake(matchId) {
-    return draftStakes[matchId] ?? DEFAULT_STAKE
+  // ── User's bets ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    async function loadBets() {
+      const { data } = await supabase
+        .from("bets").select("match_id, bet_type, bet_value, stake, odds").eq("user_id", user.id)
+      if (data) {
+        const map = {}, stakes = {}, oddsData = {}
+        data.forEach(b => {
+          map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value
+          if (b.bet_type === "result") {
+            stakes[parseInt(b.match_id)] = b.stake ?? DEFAULT_STAKE
+            if (b.odds != null) oddsData[parseInt(b.match_id)] = Number(b.odds)
+          }
+        })
+        setBets(map)
+        setSavedStakes(stakes)
+        setSavedOdds(oddsData)
+      }
+    }
+    loadBets()
+  }, [user])
+
+  // ── Live odds: all result bets + Realtime + 30s polling ─────────────────────
+  useEffect(() => {
+    fetchAllResultBets()
+    const ch = supabase.channel("matches-odds")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bets" }, fetchAllResultBets)
+      .subscribe()
+    const iv = setInterval(fetchAllResultBets, 30000)
+    return () => { supabase.removeChannel(ch); clearInterval(iv) }
+  }, [])
+
+  async function fetchAllResultBets() {
+    const { data } = await supabase.from("bets").select("match_id, bet_value, stake").eq("bet_type", "result")
+    if (data) setOddsMap(computeOddsMap(data))
   }
 
+  // ── Stake helpers ────────────────────────────────────────────────────────────
+  function getStake(matchId) { return draftStakes[matchId] ?? DEFAULT_STAKE }
   function updateStake(matchId, value) {
-    const clamped = Math.max(10, Math.min(safeBalance, value))
-    setDraftStakes(prev => ({ ...prev, [matchId]: clamped }))
+    setDraftStakes(prev => ({ ...prev, [matchId]: Math.max(10, Math.min(safeBalance, value)) }))
   }
 
+  // ── Bet placement ────────────────────────────────────────────────────────────
   async function placeBet(matchId, betType, betValue) {
     if (!user) return
     const id = parseInt(matchId)
     const stake = betType === "result" ? getStake(id) : 0
+    const liveOdds = betType === "result" ? (oddsMap[id]?.[betValue] ?? null) : null
 
     if (betType === "result" && stake > safeBalance) {
       alert("Solde insuffisant pour cette mise.")
@@ -519,23 +478,21 @@ export default function Matches({ user, balance, onBalanceChange }) {
     }
 
     const { data: existing } = await supabase
-      .from("bets").select("id, stake")
-      .eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType)
-      .maybeSingle()
+      .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType).maybeSingle()
 
     if (existing) {
-      await supabase.from("bets").update({ bet_value: betValue }).eq("id", existing.id)
+      // Update prediction (and refresh locked odds)
+      await supabase.from("bets").update({ bet_value: betValue, odds: liveOdds }).eq("id", existing.id)
+      if (betType === "result") setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
     } else {
       await supabase.from("bets").insert({
-        user_id: user.id, match_id: id, bet_type: betType,
-        bet_value: betValue,
-        ...(betType === "result" ? { stake } : {}),
+        user_id: user.id, match_id: id, bet_type: betType, bet_value: betValue,
+        ...(betType === "result" ? { stake, odds: liveOdds } : {}),
       })
-
-      // Deduct stake from balance immediately when placing a result bet
       if (betType === "result" && stake > 0) {
         await supabase.rpc("adjust_balance", { uid: user.id, delta: -stake })
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
+        setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
         onBalanceChange?.()
       }
     }
@@ -546,27 +503,17 @@ export default function Matches({ user, balance, onBalanceChange }) {
   async function cancelBet(matchId, betType) {
     if (!user) return
     const id = parseInt(matchId)
-
-    await supabase.from("bets").delete()
-      .eq("user_id", user.id)
-      .eq("match_id", id)
-      .eq("bet_type", betType)
-
-    // Restore stake to balance when cancelling a result bet
+    await supabase.from("bets").delete().eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType)
     if (betType === "result") {
       const stake = savedStakes[id] ?? 0
       if (stake > 0) {
         await supabase.rpc("adjust_balance", { uid: user.id, delta: stake })
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
+        setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
         onBalanceChange?.()
       }
     }
-
-    setBets(prev => {
-      const next = { ...prev }
-      delete next[`${id}-${betType}`]
-      return next
-    })
+    setBets(prev => { const next = { ...prev }; delete next[`${id}-${betType}`]; return next })
   }
 
   function toggleAdvanced(matchId) {
@@ -577,6 +524,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
     })
   }
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ padding: "3rem", textAlign: "center", color: C.muted }}>
       <div style={{ fontSize: "32px", marginBottom: "12px" }}>⚽</div>
@@ -594,7 +542,6 @@ export default function Matches({ user, balance, onBalanceChange }) {
 
   return (
     <div style={{ padding: "16px", maxWidth: "600px", margin: "0 auto" }}>
-
       {matches.map((match, idx) => {
         const matchId = parseInt(match.id)
         const myBet = bets[`${matchId}-result`]
@@ -604,18 +551,23 @@ export default function Matches({ user, balance, onBalanceChange }) {
         const isAdvancedOpen = expandedAdvanced.has(match.id)
         const stake = getStake(matchId)
         const stakeMax = Math.max(10, safeBalance)
+        const matchOdds = oddsMap[matchId] ?? {}
 
         const scorerCount = Object.keys(bets).filter(k => k.startsWith(`${matchId}-scorer_`)).length
         const advancedCount = ADVANCED_TYPES.filter(t => bets[`${matchId}-${t}`] != null).length + scorerCount
 
         const save = (type, val) => placeBet(matchId, type, val)
         const cancel = type => cancelBet(matchId, type)
-
         const savedScorers = Object.fromEntries(
           Object.entries(bets)
             .filter(([k]) => k.startsWith(`${matchId}-scorer_`))
             .map(([k, v]) => [k.slice(`${matchId}-`.length), v])
         )
+
+        // Saved odds & gain for placed result bet
+        const lockedOdds = savedOdds[matchId] ?? null
+        const lockedStake = savedStakes[matchId] ?? DEFAULT_STAKE
+        const lockedGain = lockedOdds ? Math.round(lockedStake * lockedOdds) : lockedStake * 2
 
         return (
           <div key={match.id}
@@ -653,7 +605,6 @@ export default function Matches({ user, balance, onBalanceChange }) {
                 </div>
                 <FormDots form={match.home.form} />
               </div>
-
               <div style={{ textAlign: "center", flexShrink: 0, minWidth: "60px" }}>
                 {isLocked ? (
                   <div>
@@ -665,7 +616,6 @@ export default function Matches({ user, balance, onBalanceChange }) {
                   <span style={{ fontSize: "14px", fontWeight: "600", color: C.dim, letterSpacing: "2px" }}>VS</span>
                 )}
               </div>
-
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span translate="no" style={{ fontWeight: "600", fontSize: "14px", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{match.away.name}</span>
@@ -679,7 +629,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
             {!isLocked && (
               <div>
                 {myBet ? (
-                  /* Bet already placed — show summary with cancel */
+                  /* Placed — show locked odds + gain */
                   <div style={{
                     padding: "10px 14px", borderRadius: "10px",
                     background: C.primaryGlow, border: `1px solid ${C.primary}33`,
@@ -689,8 +639,12 @@ export default function Matches({ user, balance, onBalanceChange }) {
                       <div style={{ fontSize: "13px", color: C.primary, fontWeight: "700" }}>
                         ✓ {myBet === "home" ? match.home.name : myBet === "away" ? match.away.name : "Nul"}
                       </div>
-                      <div style={{ fontSize: "11px", color: C.dim, marginTop: "2px" }}>
-                        Mise : {savedStakes[matchId] ?? DEFAULT_STAKE} pts · Gain potentiel : {(savedStakes[matchId] ?? DEFAULT_STAKE) * 2} pts
+                      <div style={{ fontSize: "11px", color: C.dim, marginTop: "2px", display: "flex", gap: "8px" }}>
+                        {lockedOdds && (
+                          <span style={{ color: C.odds, fontWeight: "700" }}>{fmtOdds(lockedOdds)}</span>
+                        )}
+                        <span>Mise : {lockedStake} pts</span>
+                        <span style={{ color: C.primary }}>→ {lockedGain} pts si correct</span>
                       </div>
                     </div>
                     <button onClick={() => cancel("result")} style={{
@@ -700,24 +654,57 @@ export default function Matches({ user, balance, onBalanceChange }) {
                     }}>✕ Annuler</button>
                   </div>
                 ) : (
-                  /* No bet yet — show prediction buttons + stake */
+                  /* No bet — prediction buttons with live odds + stake */
                   <>
-                    <p style={{ fontSize: "11px", color: C.dim, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>Pronostic</p>
+                    <p style={{ fontSize: "11px", color: C.dim, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>
+                      Pronostic · Cotes en direct
+                    </p>
                     <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
                       {[
                         { label: match.home.name, value: "home" },
-                        { label: "Nul", value: "draw" },
-                        { label: match.away.name, value: "away" },
-                      ].map(opt => (
-                        <button key={opt.value} onClick={() => save("result", opt.value)} style={{
-                          flex: 1, padding: "10px 6px", border: `1.5px solid ${C.border}`,
-                          borderRadius: "50px", cursor: "pointer",
-                          background: "transparent", color: C.muted,
-                          fontSize: "11px", fontWeight: "500",
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                          minWidth: 0, transition: "all 0.15s",
-                        }}>{opt.label}</button>
-                      ))}
+                        { label: "Nul",            value: "draw" },
+                        { label: match.away.name,  value: "away" },
+                      ].map(opt => {
+                        const oddsVal = matchOdds[opt.value]
+                        const potGain = oddsVal ? Math.round(stake * oddsVal) : null
+                        return (
+                          <button key={opt.value} onClick={() => save("result", opt.value)} style={{
+                            flex: 1, padding: "8px 6px",
+                            border: `1.5px solid ${C.border}`,
+                            borderRadius: "12px", cursor: "pointer",
+                            background: C.inner,
+                            color: C.muted,
+                            textAlign: "center",
+                            minWidth: 0, transition: "all 0.15s",
+                          }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = C.primary
+                              e.currentTarget.style.background = C.primaryGlow
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = C.border
+                              e.currentTarget.style.background = C.inner
+                            }}
+                          >
+                            <div style={{
+                              fontSize: "10px", fontWeight: "600", color: C.muted,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }} translate="no">{opt.label}</div>
+                            <div style={{
+                              fontSize: "16px", fontWeight: "800",
+                              color: oddsVal ? C.odds : C.dim,
+                              marginTop: "4px", letterSpacing: "-0.3px",
+                            }}>
+                              {fmtOdds(oddsVal)}
+                            </div>
+                            {potGain && (
+                              <div style={{ fontSize: "9px", color: C.primary, marginTop: "2px", fontWeight: "600" }}>
+                                → {potGain} pts
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
                     </div>
 
                     {/* Stake selector */}
@@ -727,8 +714,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
                     }}>
                       <StakeStepper value={stake} onChange={v => updateStake(matchId, v)} max={stakeMax} />
                       <div style={{ fontSize: "10px", color: C.dim, textAlign: "center", marginTop: "5px" }}>
-                        Gain si correct : <span style={{ color: C.primary, fontWeight: "700" }}>{stake * 2} pts</span>
-                        {" "}· Perte si raté : <span style={{ color: "#f87171", fontWeight: "700" }}>{stake} pts</span>
+                        Cliquez sur un résultat pour parier · Gain = mise × cote · Perte = mise
                       </div>
                     </div>
                   </>
@@ -738,19 +724,18 @@ export default function Matches({ user, balance, onBalanceChange }) {
 
             {/* Result bet — locked display */}
             {isLocked && myBet && (
-              <div style={{ marginTop: "4px", padding: "8px 12px", borderRadius: "8px", background: C.primaryGlow, border: `1px solid ${C.primary}22` }}>
+              <div style={{ marginTop: "4px", padding: "8px 12px", borderRadius: "8px", background: C.primaryGlow, border: `1px solid ${C.primary}22`, display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: "12px", color: C.primary, fontWeight: "600" }}>
                   ✓ {myBet === "home" ? match.home.name : myBet === "away" ? match.away.name : "Nul"}
                 </span>
-                {savedStakes[matchId] && (
-                  <span style={{ fontSize: "10px", color: C.dim, marginLeft: "8px" }}>
-                    Mise : {savedStakes[matchId]} pts
-                  </span>
-                )}
+                <span style={{ fontSize: "11px", color: C.dim }}>
+                  {lockedOdds && <span style={{ color: C.odds, fontWeight: "700", marginRight: "6px" }}>{fmtOdds(lockedOdds)}</span>}
+                  Mise {lockedStake} pts
+                </span>
               </div>
             )}
 
-            {/* Advanced bets — pre-match toggle */}
+            {/* Advanced bets toggle */}
             {!isLocked && (
               <div style={{ marginTop: "12px", borderTop: `1px solid ${C.border}`, paddingTop: "10px" }}>
                 <button onClick={() => toggleAdvanced(match.id)} style={{
@@ -773,52 +758,19 @@ export default function Matches({ user, balance, onBalanceChange }) {
 
                 {isAdvancedOpen && (
                   <div style={{ marginTop: "10px" }}>
-                    <GoalsBet
-                      saved={bets[`${matchId}-exact_goals`]}
-                      onSave={v => save("exact_goals", v)}
-                      onCancel={() => cancel("exact_goals")}
-                    />
-                    <CornersBet
-                      saved={bets[`${matchId}-exact_corners`]}
-                      onSave={v => save("exact_corners", v)}
-                      onCancel={() => cancel("exact_corners")}
-                    />
-                    <CardBet
-                      icon="🟥" title="Carton rouge" betType="red_card_team"
-                      saved={bets[`${matchId}-red_card_team`]}
-                      onSave={v => save("red_card_team", v)}
-                      onCancel={() => cancel("red_card_team")}
-                      homeName={match.home.name} awayName={match.away.name}
-                    />
-                    <CardBet
-                      icon="🟨" title="Carton jaune" betType="yellow_card_team"
-                      saved={bets[`${matchId}-yellow_card_team`]}
-                      onSave={v => save("yellow_card_team", v)}
-                      onCancel={() => cancel("yellow_card_team")}
-                      homeName={match.home.name} awayName={match.away.name}
-                    />
-                    <PossessionBet
-                      saved={bets[`${matchId}-possession_home`]}
-                      onSave={v => save("possession_home", v)}
-                      onCancel={() => cancel("possession_home")}
-                      homeName={match.home.name} awayName={match.away.name}
-                    />
-                    <ScorersBet
-                      savedScorers={savedScorers}
-                      onSave={(key, val) => save(key, val)}
-                      onCancel={key => cancel(key)}
-                    />
+                    <GoalsBet saved={bets[`${matchId}-exact_goals`]} onSave={v => save("exact_goals", v)} onCancel={() => cancel("exact_goals")} />
+                    <CornersBet saved={bets[`${matchId}-exact_corners`]} onSave={v => save("exact_corners", v)} onCancel={() => cancel("exact_corners")} />
+                    <CardBet icon="🟥" title="Carton rouge" betType="red_card_team" saved={bets[`${matchId}-red_card_team`]} onSave={v => save("red_card_team", v)} onCancel={() => cancel("red_card_team")} homeName={match.home.name} awayName={match.away.name} />
+                    <CardBet icon="🟨" title="Carton jaune" betType="yellow_card_team" saved={bets[`${matchId}-yellow_card_team`]} onSave={v => save("yellow_card_team", v)} onCancel={() => cancel("yellow_card_team")} homeName={match.home.name} awayName={match.away.name} />
+                    <PossessionBet saved={bets[`${matchId}-possession_home`]} onSave={v => save("possession_home", v)} onCancel={() => cancel("possession_home")} homeName={match.home.name} awayName={match.away.name} />
+                    <ScorersBet savedScorers={savedScorers} onSave={(key, val) => save(key, val)} onCancel={key => cancel(key)} />
                   </div>
                 )}
               </div>
             )}
 
-            {/* Advanced bets — locked summary */}
             {isLocked && (
-              <LockedAdvancedSummary
-                bets={bets} matchId={matchId}
-                homeName={match.home.name} awayName={match.away.name}
-              />
+              <LockedAdvancedSummary bets={bets} matchId={matchId} homeName={match.home.name} awayName={match.away.name} />
             )}
           </div>
         )

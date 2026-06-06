@@ -23,6 +23,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("matches")
   const [balance, setBalance] = useState(null)
+  const [activeBettors, setActiveBettors] = useState(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [username, setUsername] = useState("")
@@ -37,20 +38,35 @@ export default function App() {
     if (data) setBalance(data.balance ?? 1000)
   }, [])
 
+  const fetchActiveBettors = useCallback(async () => {
+    const { data } = await supabase.rpc("count_active_bettors")
+    if (data != null) setActiveBettors(data)
+  }, [])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) fetchBalance(u.id)
+      if (u) { fetchBalance(u.id); fetchActiveBettors() }
     })
     supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) fetchBalance(u.id)
-      else { setBalance(null) }
+      if (u) { fetchBalance(u.id); fetchActiveBettors() }
+      else { setBalance(null); setActiveBettors(null) }
     })
     importMatches()
-  }, [fetchBalance])
+  }, [fetchBalance, fetchActiveBettors])
+
+  // Active bettors: Realtime + 30s polling
+  useEffect(() => {
+    if (!user) return
+    const ch = supabase.channel("app-bettors")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "bets" }, fetchActiveBettors)
+      .subscribe()
+    const iv = setInterval(fetchActiveBettors, 30000)
+    return () => { supabase.removeChannel(ch); clearInterval(iv) }
+  }, [user, fetchActiveBettors])
 
   async function handleSubmit() {
     setLoading(true); setError("")
@@ -89,20 +105,30 @@ export default function App() {
         position: "sticky", top: 0, zIndex: 20,
         boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
       }}>
-        {/* Left: logo + balance */}
+        {/* Left: logo + balance + bettors */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "22px" }}>⚽</span>
           <div>
-            <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>CdM Paris 2026</div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.7)" }}>Pronostics</span>
+            <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>
+              CdM Paris 2026
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px", flexWrap: "wrap" }}>
               {balance !== null && (
                 <span style={{
                   fontSize: "11px", fontWeight: "800", color: "white",
-                  background: "rgba(255,255,255,0.18)", borderRadius: "12px",
-                  padding: "1px 8px", letterSpacing: "0.2px",
+                  background: "rgba(255,255,255,0.18)", borderRadius: "10px",
+                  padding: "1px 7px",
                 }}>
                   💰 {balance.toLocaleString("fr-FR")} pts
+                </span>
+              )}
+              {activeBettors !== null && activeBettors > 0 && (
+                <span style={{
+                  fontSize: "10px", fontWeight: "600", color: "rgba(255,255,255,0.85)",
+                  background: "rgba(255,255,255,0.12)", borderRadius: "10px",
+                  padding: "1px 7px",
+                }}>
+                  👥 {activeBettors} parieur{activeBettors > 1 ? "s" : ""}
                 </span>
               )}
             </div>
@@ -171,7 +197,6 @@ export default function App() {
     }}>
       <div style={{ width: "100%", maxWidth: "400px" }}>
 
-        {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
           <div style={{
             width: "72px", height: "72px", borderRadius: "20px", margin: "0 auto 16px",
@@ -183,7 +208,6 @@ export default function App() {
           <p style={{ fontSize: "14px", color: C.muted, marginTop: "6px" }}>Pronostics Coupe du Monde</p>
         </div>
 
-        {/* Form */}
         <div style={{
           background: C.card, borderRadius: "20px", padding: "24px",
           border: `1px solid ${C.border}`,

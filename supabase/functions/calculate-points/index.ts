@@ -15,6 +15,7 @@ Deno.serve(async (_req) => {
     let matchesProcessed = 0
     const usersUpdated = new Set()
 
+    // Process unprocessed result bets
     for (const match of matches ?? []) {
       const hs = Number(match.home_score)
       const as_ = Number(match.away_score)
@@ -22,7 +23,7 @@ Deno.serve(async (_req) => {
 
       const { data: bets } = await supabase
         .from("bets")
-        .select("id, user_id, bet_value, stake")
+        .select("id, user_id, bet_value, stake, odds")
         .eq("match_id", match.id)
         .eq("bet_type", "result")
         .eq("processed", false)
@@ -30,15 +31,23 @@ Deno.serve(async (_req) => {
       for (const bet of bets ?? []) {
         const correct = bet.bet_value === result
         const stake = bet.stake ?? 10
+        // Use stored odds for payout; fallback to 2.0 if no odds recorded
+        const odds = bet.odds ?? 2.0
+        const payout = Math.round(stake * odds)
+
         if (correct) {
-          await supabase.rpc("award_bet_win", { uid: bet.user_id, delta_balance: stake * 2 })
+          // Award: +1 point AND pay stake*odds (stake was already deducted on placement)
+          await supabase.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
         }
+        // Incorrect: stake already gone — nothing more to do
+
         await supabase.from("bets").update({ processed: true }).eq("id", bet.id)
         usersUpdated.add(bet.user_id)
       }
       matchesProcessed++
     }
 
+    // Process pending combined bets
     const { data: pendingCombined } = await supabase
       .from("combined_bets")
       .select("*")
