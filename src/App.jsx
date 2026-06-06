@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "./supabase"
 import Matches from "./pages/Matches"
+import Ranking from "./pages/Ranking"
 import League from "./pages/League"
 import { importMatches } from "./importMatches"
 
@@ -89,7 +90,9 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches" ? <Matches user={user} /> : <League user={user} />}
+        {page === "matches" && <Matches user={user} />}
+        {page === "ranking" && <Ranking user={user} />}
+        {page === "league"  && <League user={user} />}
       </div>
 
       {/* Bottom nav */}
@@ -101,7 +104,8 @@ export default function App() {
       }}>
         {[
           { id: "matches", icon: "⚽", label: "Matchs" },
-          { id: "league",  icon: "🏆", label: "Ma Ligue" },
+          { id: "ranking", icon: "🏆", label: "Classement" },
+          { id: "league",  icon: "🤝", label: "Ma Ligue" },
         ].map(tab => (
           <button key={tab.id} onClick={() => setPage(tab.id)} style={{
             flex: 1, display: "flex", flexDirection: "column",
