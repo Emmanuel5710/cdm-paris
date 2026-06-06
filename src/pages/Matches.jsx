@@ -8,6 +8,33 @@ const C = {
   text: "#f1f5f9", muted: "#94a3b8", dim: "#64748b",
 }
 
+const ADVANCED_BETS = [
+  {
+    type: "over_under",
+    label: "Plus de 2.5 buts ?",
+    options: [{ label: "Oui", value: "yes" }, { label: "Non", value: "no" }],
+  },
+  {
+    type: "possession",
+    label: "Plus de possession ?",
+    options: (home, away) => [
+      { label: home, value: "home" },
+      { label: "Égal", value: "draw" },
+      { label: away, value: "away" },
+    ],
+  },
+  {
+    type: "red_card",
+    label: "Carton rouge ?",
+    options: [{ label: "Oui", value: "yes" }, { label: "Non", value: "no" }],
+  },
+  {
+    type: "corners",
+    label: "Plus de 8 corners ?",
+    options: [{ label: "Oui", value: "yes" }, { label: "Non", value: "no" }],
+  },
+]
+
 function parseMatches(data) {
   return (data.events || []).map(ev => {
     const comp = ev.competitions?.[0]
@@ -41,11 +68,48 @@ function FormDots({ form }) {
   )
 }
 
+function BetRow({ label, options, selected, onSelect, locked }) {
+  return (
+    <div style={{ marginBottom: "10px" }}>
+      <p style={{ fontSize: "11px", color: C.dim, marginBottom: "6px", fontWeight: "600" }}>{label}</p>
+      {locked ? (
+        selected ? (
+          <span style={{ fontSize: "12px", color: C.primary, fontWeight: "600" }}>
+            ✓ {options.find(o => o.value === selected)?.label ?? selected}
+          </span>
+        ) : null
+      ) : (
+        <div style={{ display: "flex", gap: "6px" }}>
+          {options.map(opt => {
+            const isSelected = selected === opt.value
+            return (
+              <button key={opt.value} onClick={() => onSelect(opt.value)}
+                style={{
+                  flex: 1, padding: "8px 4px", border: "1.5px solid",
+                  borderColor: isSelected ? C.primary : C.border,
+                  borderRadius: "50px", cursor: "pointer",
+                  background: isSelected ? C.primaryGlow : "transparent",
+                  color: isSelected ? C.primary : C.muted,
+                  fontSize: "11px", fontWeight: isSelected ? "700" : "500",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  minWidth: 0, transition: "all 0.15s",
+                }}>
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Matches({ user }) {
   const [matches, setMatches] = useState([])
   const [bets, setBets] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
   const intervalRef = useRef(null)
 
   useEffect(() => { fetchMatches().finally(() => setLoading(false)) }, [])
@@ -93,6 +157,14 @@ export default function Matches({ user }) {
     setBets(prev => ({ ...prev, [`${id}-${betType}`]: betValue }))
   }
 
+  function toggleAdvanced(matchId) {
+    setExpandedAdvanced(prev => {
+      const next = new Set(prev)
+      next.has(matchId) ? next.delete(matchId) : next.add(matchId)
+      return next
+    })
+  }
+
   async function calculatePoints() {
     const { data, error: err } = await supabase.functions.invoke("calculate-points")
     if (err) alert("Erreur : " + err.message)
@@ -125,11 +197,21 @@ export default function Matches({ user }) {
       }}>⚙️ Calculer les points</button>
 
       {matches.map((match, idx) => {
-        const betKey = `${parseInt(match.id)}-result`
+        const matchId = parseInt(match.id)
+        const betKey = `${matchId}-result`
         const myBet = bets[betKey]
         const isLive = match.state === "in"
         const isFinished = match.state === "post"
         const isLocked = isLive || isFinished
+        const isAdvancedOpen = expandedAdvanced.has(match.id)
+
+        const advancedBetsWithValues = ADVANCED_BETS.map(bet => ({
+          ...bet,
+          options: typeof bet.options === "function" ? bet.options(match.home.name, match.away.name) : bet.options,
+          currentValue: bets[`${matchId}-${bet.type}`],
+        }))
+
+        const hasAnyAdvancedBet = advancedBetsWithValues.some(b => b.currentValue)
 
         return (
           <div key={match.id}
@@ -211,7 +293,7 @@ export default function Matches({ user }) {
               </div>
             </div>
 
-            {/* Bet buttons */}
+            {/* Bet buttons — result */}
             {!isLocked && (
               <div>
                 <p style={{ fontSize: "11px", color: C.dim, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>
@@ -226,7 +308,7 @@ export default function Matches({ user }) {
                     const selected = myBet === opt.value
                     return (
                       <button key={opt.value}
-                        onClick={() => placeBet(parseInt(match.id), "result", opt.value)}
+                        onClick={() => placeBet(matchId, "result", opt.value)}
                         style={{
                           flex: 1, padding: "10px 6px", border: `1.5px solid`,
                           borderColor: selected ? C.primary : C.border,
@@ -245,6 +327,7 @@ export default function Matches({ user }) {
               </div>
             )}
 
+            {/* Result bet display when locked */}
             {isLocked && myBet && (
               <div style={{
                 marginTop: "4px", padding: "8px 12px", borderRadius: "8px",
@@ -253,6 +336,62 @@ export default function Matches({ user }) {
                 <span style={{ fontSize: "12px", color: C.primary, fontWeight: "600" }}>
                   ✓ {myBet === "home" ? match.home.name : myBet === "away" ? match.away.name : "Nul"}
                 </span>
+              </div>
+            )}
+
+            {/* Advanced bets section */}
+            {!isLocked && (
+              <div style={{ marginTop: "12px", borderTop: `1px solid ${C.border}`, paddingTop: "10px" }}>
+                <button onClick={() => toggleAdvanced(match.id)} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", background: "none", border: "none", cursor: "pointer",
+                  color: isAdvancedOpen ? C.primary : C.muted,
+                  fontSize: "11px", fontWeight: "600", padding: "0 0 8px 0",
+                  textTransform: "uppercase", letterSpacing: "0.5px",
+                }}>
+                  <span>Paris avancés {hasAnyAdvancedBet && <span style={{ color: C.primary }}>●</span>}</span>
+                  <span style={{ fontSize: "10px" }}>{isAdvancedOpen ? "▲" : "▼"}</span>
+                </button>
+
+                {isAdvancedOpen && (
+                  <div style={{
+                    background: "#141e2a", borderRadius: "10px", padding: "12px",
+                    border: `1px solid ${C.border}`,
+                  }}>
+                    {advancedBetsWithValues.map(bet => (
+                      <BetRow
+                        key={bet.type}
+                        label={bet.label}
+                        options={bet.options}
+                        selected={bet.currentValue}
+                        onSelect={val => placeBet(matchId, bet.type, val)}
+                        locked={false}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Advanced bets summary when locked */}
+            {isLocked && hasAnyAdvancedBet && (
+              <div style={{
+                marginTop: "8px", borderTop: `1px solid ${C.border}`, paddingTop: "8px",
+              }}>
+                <p style={{ fontSize: "10px", color: C.dim, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>
+                  Paris avancés
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {advancedBetsWithValues.filter(b => b.currentValue).map(bet => (
+                    <span key={bet.type} style={{
+                      fontSize: "11px", color: C.primary, fontWeight: "600",
+                      background: C.primaryGlow, padding: "4px 10px", borderRadius: "20px",
+                      border: `1px solid ${C.primary}33`,
+                    }}>
+                      {bet.label.replace(" ?", "")} : {bet.options.find(o => o.value === bet.currentValue)?.label ?? bet.currentValue}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
