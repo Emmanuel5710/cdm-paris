@@ -86,7 +86,7 @@ function Stepper({ value, min, max, display, onChange }) {
       fontSize: "22px", fontWeight: "500", lineHeight: "1",
       display: "flex", alignItems: "center", justifyContent: "center",
       flexShrink: 0, transition: "all 0.15s",
-    }}>{label}</Btn>
+    }}>{label}</button>
   )
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "12px", justifyContent: "center" }}>
