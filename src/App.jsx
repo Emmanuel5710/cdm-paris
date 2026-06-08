@@ -25,6 +25,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [page, setPage] = useState("matches")
+  const [allBets, setAllBets] = useState({ bets: {}, stakes: {}, odds: {} })
   const [credits, setCredits] = useState(0)
   const [xp, setXp] = useState(0)
   const [activeBettors, setActiveBettors] = useState(null)
@@ -44,6 +45,23 @@ export default function App() {
       setXp(data.xp ?? 0)
       setUsername(data.username ?? "")
     }
+  }, [])
+
+  const loadBets = useCallback(async (uid) => {
+    const { data } = await supabase.from("bets")
+      .select("match_id, bet_type, bet_value, stake, odds")
+      .eq("user_id", uid)
+    if (!data) return
+    const bets = {}, stakes = {}, odds = {}
+    data.forEach(b => {
+      const mid = parseInt(b.match_id)
+      bets[`${mid}-${b.bet_type}`] = b.bet_value
+      if (b.bet_type === "result") {
+        stakes[mid] = b.stake ?? 50
+        if (b.odds != null) odds[mid] = Number(b.odds)
+      }
+    })
+    setAllBets({ bets, stakes, odds })
   }, [])
 
   const fetchActiveBettors = useCallback(async () => {
@@ -69,16 +87,17 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return
+    loadBets(user.id)
     // Charger le profil initial
     supabase.from("profiles").select("credits, xp, username").eq("id", user.id).single()
-      .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp) } })
+      .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp); setUsername(data.username ?? "") } })
     // Écouter les changements en temps réel
     const channel = supabase.channel("profile-" + user.id)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + user.id },
         (payload) => { setCredits(payload.new.credits); setXp(payload.new.xp) })
       .subscribe()
     return () => channel.unsubscribe()
-  }, [user])
+  }, [user, loadBets])
 
   // Active bettors: Realtime + 30s polling
   useEffect(() => {
@@ -208,7 +227,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
+        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} initialBets={allBets} onBalanceChange={refreshProfile} onBetPlaced={() => { refreshProfile(); loadBets(user.id) }} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
@@ -228,6 +247,7 @@ export default function App() {
           { id: "combined", icon: "🎯", label: "Combiné"    },
           { id: "ranking",  icon: "🏆", label: "Classement" },
           { id: "mybets",   icon: "🎰", label: "Mes Paris"  },
+          { id: "league",   icon: "🤝", label: "Ma Ligue"   },
           { id: "shop",     icon: "🛍️", label: "Boutique"   },
         ].map(tab => (
           <button key={tab.id} onClick={() => setPage(tab.id)} style={{

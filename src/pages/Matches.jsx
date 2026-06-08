@@ -460,12 +460,12 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Matches({ user, credits, onBalanceChange, onBetPlaced }) {
+export default function Matches({ user, credits, initialBets, onBalanceChange, onBetPlaced }) {
   const [matches, setMatches] = useState([])
-  const [bets, setBets] = useState({})
+  const [bets, setBets] = useState(initialBets?.bets ?? {})
   const [draftStakes, setDraftStakes] = useState({})
-  const [savedStakes, setSavedStakes] = useState({})
-  const [savedOdds, setSavedOdds] = useState({})    // { matchId: odds at time of bet }
+  const [savedStakes, setSavedStakes] = useState(initialBets?.stakes ?? {})
+  const [savedOdds, setSavedOdds] = useState(initialBets?.odds ?? {})    // { matchId: odds at time of bet }
   const [oddsMap, setOddsMap] = useState({})         // { matchId: { home, draw, away } } — live
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -478,6 +478,14 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     return new Set(["finale"])
   })
   const intervalRef = useRef(null)
+
+  // Sync bets from App-level prop when they change (e.g. after refresh)
+  useEffect(() => {
+    if (!initialBets) return
+    if (initialBets.bets) setBets(initialBets.bets)
+    if (initialBets.stakes) setSavedStakes(initialBets.stakes)
+    if (initialBets.odds) setSavedOdds(initialBets.odds)
+  }, [initialBets])
 
   // Local credits mirrors the App prop but updates optimistically on bet placement
   const [localCredits, setLocalCredits] = useState(credits ?? 500)
@@ -502,49 +510,6 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       setError("")
     } catch { setError("Impossible de charger les matchs ESPN.") }
   }
-
-  // ── User's bets — loaded at startup and whenever user changes ───────────────
-  useEffect(() => {
-    if (!user || !user.id) return
-    supabase
-      .from("bets")
-      .select("match_id, bet_type, bet_value, stake, odds")
-      .eq("user_id", user.id)
-      .then(({ data }) => {
-        if (!data) return
-        const map = {}, stakes = {}, oddsData = {}
-        data.forEach(b => {
-          const mid = parseInt(b.match_id)
-          map[`${mid}-${b.bet_type}`] = b.bet_value
-          if (b.bet_type === "result") {
-            stakes[mid] = b.stake ?? 50
-            if (b.odds != null) oddsData[mid] = Number(b.odds)
-          }
-        })
-        setBets(map)
-        setSavedStakes(stakes)
-        setSavedOdds(oddsData)
-      })
-  }, [user])
-
-  useEffect(() => {
-    if (bets && Object.keys(bets).length > 0) return
-    if (!user?.id) return
-    const timer = setTimeout(() => {
-      supabase.from('bets').select('match_id, bet_type, bet_value, stake, odds').eq('user_id', user.id)
-        .then(({ data }) => {
-          if (!data || data.length === 0) return
-          const map = {}, stakes = {}, oddsData = {}
-          data.forEach(b => {
-            const mid = parseInt(b.match_id)
-            map[`${mid}-${b.bet_type}`] = b.bet_value
-            if (b.bet_type === 'result') { stakes[mid] = b.stake ?? 50; if (b.odds != null) oddsData[mid] = Number(b.odds) }
-          })
-          setBets(map); setSavedStakes(stakes); setSavedOdds(oddsData)
-        })
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [user?.id, Object.keys(bets).length])
 
   // ── Live odds: all result bets + Realtime + 30s polling ─────────────────────
   useEffect(() => {
