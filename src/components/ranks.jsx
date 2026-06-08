@@ -1,15 +1,15 @@
 // Shared rank system — used by League.jsx and Ranking.jsx
 
 export const RANKS = [
-  { name: "Bronze",  abbrev: "BRZ", min: 0,    max: 99,
+  { name: "Bronze",  abbrev: "BRZ", min: 0,     max: 500,
     color: "#CD7F32", colorLight: "#E09A50", colorDark: "#7A4010" },
-  { name: "Argent",  abbrev: "ARG", min: 100,  max: 249,
+  { name: "Argent",  abbrev: "ARG", min: 501,   max: 2000,
     color: "#C0C0C0", colorLight: "#E0E0E0", colorDark: "#787878" },
-  { name: "Or",      abbrev: "OR",  min: 250,  max: 499,
+  { name: "Or",      abbrev: "OR",  min: 2001,  max: 5000,
     color: "#FFD700", colorLight: "#FFE84D", colorDark: "#A07800" },
-  { name: "Diamant", abbrev: "DIA", min: 500,  max: 999,
+  { name: "Diamant", abbrev: "DIA", min: 5001,  max: 15000,
     color: "#00BFFF", colorLight: "#50D8FF", colorDark: "#006FA8" },
-  { name: "Légende", abbrev: "LGD", min: 1000, max: null,
+  { name: "Légende", abbrev: "LGD", min: 15001, max: null,
     color: "#9B59B6", colorLight: "#BF7FD8", colorDark: "#5B2878" },
 ]
 
