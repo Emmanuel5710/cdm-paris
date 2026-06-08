@@ -33,12 +33,29 @@ function getGroup(ev) {
 }
 
 function getJournee(isoDate) {
-  if (!isoDate) return "Phase finale"
+  if (!isoDate) return "finale"
   const d = new Date(isoDate)
-  if (d < new Date("2026-06-16T00:00:00Z")) return "Journée 1"
-  if (d < new Date("2026-06-21T00:00:00Z")) return "Journée 2"
-  if (d < new Date("2026-06-26T00:00:00Z")) return "Journée 3"
-  return "Phase finale"
+  if (d < new Date("2026-06-16T00:00:00Z")) return "j1"
+  if (d < new Date("2026-06-21T00:00:00Z")) return "j2"
+  if (d < new Date("2026-06-26T00:00:00Z")) return "j3"
+  return "finale"
+}
+
+function getFinaleRound(ev) {
+  const stn = ev.season?.type?.name ?? ""
+  if (/round of 32/i.test(stn))  return "Round of 32"
+  if (/round of 16/i.test(stn))  return "Round of 16"
+  if (/quarter/i.test(stn))       return "Quarts de finale"
+  if (/semi/i.test(stn))          return "Demi-finales"
+  if (/3rd|third/i.test(stn))     return "3ème place"
+  if (/final/i.test(stn))         return "Finale"
+  const d = new Date(ev.date)
+  if (d < new Date("2026-07-01T00:00:00Z")) return "Round of 32"
+  if (d < new Date("2026-07-06T00:00:00Z")) return "Round of 16"
+  if (d < new Date("2026-07-09T00:00:00Z")) return "Quarts de finale"
+  if (d < new Date("2026-07-12T00:00:00Z")) return "Demi-finales"
+  if (d < new Date("2026-07-14T00:00:00Z")) return "3ème place"
+  return "Finale"
 }
 
 function formatFrenchDate(iso) {
@@ -64,6 +81,7 @@ function parseMatches(data) {
       date: ev.date ?? null,
       group: getGroup(ev),
       journee: getJournee(ev.date),
+      finaleRound: getFinaleRound(ev),
       state: comp?.status?.type?.state,
       displayClock: comp?.status?.displayClock,
       venue: comp?.venue?.fullName,
@@ -438,7 +456,13 @@ export default function Matches({ user, balance, onBalanceChange }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
-  const [filter, setFilter] = useState("Tous")
+  const [expandedJournees, setExpandedJournees] = useState(() => {
+    const t = new Date().toISOString().slice(0, 10)
+    if (t < "2026-06-16") return new Set(["j1"])
+    if (t < "2026-06-21") return new Set(["j2"])
+    if (t < "2026-06-26") return new Set(["j3"])
+    return new Set(["finale"])
+  })
   const intervalRef = useRef(null)
 
   const safeBalance = balance ?? 1000
@@ -582,68 +606,38 @@ export default function Matches({ user, balance, onBalanceChange }) {
     </div>
   )
 
-  const GROUP_FILTERS = ["Tous","Groupe A","Groupe B","Groupe C","Groupe D","Groupe E","Groupe F","Groupe G","Groupe H","Groupe I","Groupe J","Groupe K","Groupe L","Phase finale"]
-  const availableGroups = new Set(matches.map(m => m.group))
-  const visibleFilters = GROUP_FILTERS.filter(f => f === "Tous" || availableGroups.has(f))
-  const filteredMatches = filter === "Tous" ? matches : matches.filter(m => m.group === filter)
-  const JOURNEE_ORDER = ["Journée 1", "Journée 2", "Journée 3", "Phase finale"]
-  const matchesByJournee = {}
-  for (const m of filteredMatches) {
-    if (!matchesByJournee[m.journee]) matchesByJournee[m.journee] = []
-    matchesByJournee[m.journee].push(m)
+  const JOURNEES = [
+    { id: "j1",     label: "Journée 1",    dates: "11–15 juin"         },
+    { id: "j2",     label: "Journée 2",    dates: "16–20 juin"         },
+    { id: "j3",     label: "Journée 3",    dates: "21–25 juin"         },
+    { id: "finale", label: "Phase finale", dates: "26 juin – 19 juil." },
+  ]
+  const GROUP_ORDER = ["Groupe A","Groupe B","Groupe C","Groupe D","Groupe E","Groupe F","Groupe G","Groupe H","Groupe I","Groupe J","Groupe K","Groupe L"]
+  const ROUND_ORDER = ["Round of 32","Round of 16","Quarts de finale","Demi-finales","3ème place","Finale"]
+
+  const byJournee = {}, byJourneeGroup = {}, byJourneeRound = {}
+  for (const m of matches) {
+    if (!byJournee[m.journee]) byJournee[m.journee] = []
+    byJournee[m.journee].push(m)
+    if (m.journee !== "finale") {
+      if (!byJourneeGroup[m.journee]) byJourneeGroup[m.journee] = {}
+      if (!byJourneeGroup[m.journee][m.group]) byJourneeGroup[m.journee][m.group] = []
+      byJourneeGroup[m.journee][m.group].push(m)
+    } else {
+      if (!byJourneeRound[m.finaleRound]) byJourneeRound[m.finaleRound] = []
+      byJourneeRound[m.finaleRound].push(m)
+    }
   }
 
-  return (
-    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+  function toggleJournee(id) {
+    setExpandedJournees(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
-      {/* Filter buttons — sticky, horizontal scroll on mobile */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 10,
-        background: C.bg, borderBottom: `1px solid ${C.border}`,
-        padding: "8px 16px 6px",
-      }}>
-        <div style={{
-          display: "flex", gap: "6px", overflowX: "auto",
-          paddingBottom: "2px", scrollbarWidth: "none",
-        }}>
-          {visibleFilters.map(f => (
-            <button key={f} onClick={() => setFilter(f)} style={{
-              flexShrink: 0, padding: "5px 12px", borderRadius: "20px",
-              border: `1px solid ${filter === f ? C.primary : C.border}`,
-              cursor: "pointer", fontSize: "12px",
-              fontWeight: filter === f ? "700" : "500",
-              background: filter === f ? C.primary : C.card,
-              color: filter === f ? "white" : C.muted,
-              whiteSpace: "nowrap", transition: "all 0.15s",
-            }}>{f}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Matches grouped by journée */}
-      <div style={{ padding: "0 16px 16px" }}>
-        {filteredMatches.length === 0 && (
-          <div style={{ textAlign: "center", padding: "3rem", color: C.muted }}>
-            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
-            Aucun match dans ce groupe
-          </div>
-        )}
-        {JOURNEE_ORDER.filter(j => matchesByJournee[j]).map(journee => (
-          <div key={journee}>
-            {/* Journée separator */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "10px",
-              padding: "16px 0 10px",
-            }}>
-              <div style={{ flex: 1, height: "1px", background: C.border }} />
-              <span style={{
-                fontSize: "11px", fontWeight: "800", color: C.primary,
-                textTransform: "uppercase", letterSpacing: "1px",
-              }}>{journee}</span>
-              <div style={{ flex: 1, height: "1px", background: C.border }} />
-            </div>
-
-      {matchesByJournee[journee].map((match, idx) => {
+  function renderMatchCard(match, idx) {
         const matchId = parseInt(match.id)
         const myBet = bets[`${matchId}-result`]
         const isLive = match.state === "in"
@@ -890,10 +884,82 @@ export default function Matches({ user, balance, onBalanceChange }) {
             )}
           </div>
         )
-      })}
+  }
+
+  return (
+    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+      {JOURNEES.filter(j => byJournee[j.id]?.length).map(j => {
+        const isExp = expandedJournees.has(j.id)
+        const jMatches = byJournee[j.id] || []
+        return (
+          <div key={j.id}>
+            <button onClick={() => toggleJournee(j.id)} style={{
+              width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "14px 16px", border: "none",
+              borderBottom: `1px solid ${isExp ? "rgba(29,158,117,0.3)" : C.border}`,
+              cursor: "pointer",
+              background: isExp
+                ? "linear-gradient(135deg, rgba(29,158,117,0.12), rgba(29,158,117,0.04))"
+                : C.card,
+              transition: "background 0.2s",
+            }}>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: "16px", fontWeight: "800", color: isExp ? C.primary : C.text }}>
+                  {j.label}
+                </div>
+                <div style={{ fontSize: "11px", color: C.dim, marginTop: "2px" }}>
+                  {j.dates} · {jMatches.length} match{jMatches.length > 1 ? "s" : ""}
+                </div>
+              </div>
+              <span style={{
+                fontSize: "12px", color: isExp ? C.primary : C.muted,
+                display: "inline-block", transition: "transform 0.2s",
+                transform: isExp ? "rotate(180deg)" : "none",
+              }}>▼</span>
+            </button>
+            {isExp && (
+              <div>
+                {j.id !== "finale"
+                  ? GROUP_ORDER.filter(grp => byJourneeGroup[j.id]?.[grp]?.length).map(grp => (
+                    <div key={grp}>
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "12px 16px 6px",
+                      }}>
+                        <span style={{
+                          fontSize: "11px", fontWeight: "800", color: C.muted,
+                          textTransform: "uppercase", letterSpacing: "0.8px", flexShrink: 0,
+                        }}>{grp}</span>
+                        <div style={{ flex: 1, height: "1px", background: C.border }} />
+                      </div>
+                      <div style={{ padding: "0 16px 4px" }}>
+                        {byJourneeGroup[j.id][grp].map((match, idx) => renderMatchCard(match, idx))}
+                      </div>
+                    </div>
+                  ))
+                  : ROUND_ORDER.filter(r => byJourneeRound[r]?.length).map(r => (
+                    <div key={r}>
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "12px 16px 6px",
+                      }}>
+                        <span style={{
+                          fontSize: "11px", fontWeight: "800", color: C.muted,
+                          textTransform: "uppercase", letterSpacing: "0.8px", flexShrink: 0,
+                        }}>{r}</span>
+                        <div style={{ flex: 1, height: "1px", background: C.border }} />
+                      </div>
+                      <div style={{ padding: "0 16px 4px" }}>
+                        {byJourneeRound[r].map((match, idx) => renderMatchCard(match, idx))}
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
