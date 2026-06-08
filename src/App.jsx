@@ -5,6 +5,7 @@ import Ranking from "./pages/Ranking"
 import League from "./pages/League"
 import Combined from "./pages/Combined"
 import Shop from "./pages/Shop"
+import MyBets from "./pages/MyBets"
 import { importMatches } from "./importMatches"
 
 const C = {
@@ -212,6 +213,7 @@ export default function App() {
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
         {page === "shop"     && <Shop     user={user} credits={credits} onBalanceChange={onBalanceChange} />}
+        {page === "mybets"   && <MyBets   user={user} />}
       </div>
 
       {/* Bottom nav */}
@@ -225,7 +227,7 @@ export default function App() {
           { id: "matches",  icon: "⚽", label: "Matchs"     },
           { id: "combined", icon: "🎯", label: "Combiné"    },
           { id: "ranking",  icon: "🏆", label: "Classement" },
-          { id: "league",   icon: "🤝", label: "Ma Ligue"   },
+          { id: "mybets",   icon: "🎰", label: "Mes Paris"  },
           { id: "shop",     icon: "🛍️", label: "Boutique"   },
         ].map(tab => (
           <button key={tab.id} onClick={() => setPage(tab.id)} style={{
