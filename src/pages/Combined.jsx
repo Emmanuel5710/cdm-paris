@@ -163,7 +163,7 @@ function stepBtn(enabled) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Combined({ user, balance, onBalanceChange }) {
+export default function Combined({ user, credits, onBalanceChange }) {
   const [view, setView] = useState("create")
   const [matches, setMatches] = useState([])
   const [selected, setSelected] = useState(new Set())
@@ -233,7 +233,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
   const selCount = selected.size
   const mult = getMultiplier(selCount)
   const allPredicted = selCount >= 2 && [...selected].every(id => preds[id])
-  const safeBalance = balance ?? 1000
+  const safeBalance = credits ?? 100
   const MIN_BALANCE = 50
   const canBet = safeBalance > MIN_BALANCE
   const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
@@ -264,7 +264,7 @@ export default function Combined({ user, balance, onBalanceChange }) {
 
     if (error) { alert("Erreur : " + error.message); setSaving(false); return }
 
-    await supabase.rpc("adjust_balance", { uid: user.id, delta: -cappedStake })
+    await supabase.rpc("adjust_credits", { uid: user.id, delta: -cappedStake })
     onBalanceChange?.()
 
     setSelected(new Set()); setPreds({})

@@ -74,7 +74,9 @@ Deno.serve(async (_req) => {
       }
 
       if (allCorrect) {
-        await supabase.rpc("adjust_balance", { uid: cb.user_id, delta: cb.stake * cb.multiplier })
+        const gain = cb.stake * cb.multiplier
+        await supabase.rpc("adjust_credits", { uid: cb.user_id, delta: gain })
+        await supabase.rpc("adjust_xp",      { uid: cb.user_id, delta: gain })
       }
 
       await supabase

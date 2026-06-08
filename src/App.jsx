@@ -23,7 +23,8 @@ const inp = {
 export default function App() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("matches")
-  const [balance, setBalance] = useState(null)
+  const [credits, setCredits] = useState(null)
+  const [xp, setXp] = useState(null)
   const [activeBettors, setActiveBettors] = useState(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -33,10 +34,10 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const fetchBalance = useCallback(async (uid) => {
+  const fetchProfile = useCallback(async (uid) => {
     const { data } = await supabase
-      .from("profiles").select("balance").eq("id", uid).single()
-    if (data) setBalance(data.balance ?? 1000)
+      .from("profiles").select("credits, xp").eq("id", uid).single()
+    if (data) { setCredits(data.credits ?? 100); setXp(data.xp ?? 0) }
   }, [])
 
   const fetchActiveBettors = useCallback(async () => {
@@ -48,16 +49,16 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) { fetchBalance(u.id); fetchActiveBettors() }
+      if (u) { fetchProfile(u.id); fetchActiveBettors() }
     })
     supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) { fetchBalance(u.id); fetchActiveBettors() }
-      else { setBalance(null); setActiveBettors(null) }
+      if (u) { fetchProfile(u.id); fetchActiveBettors() }
+      else { setCredits(null); setXp(null); setActiveBettors(null) }
     })
     importMatches()
-  }, [fetchBalance, fetchActiveBettors])
+  }, [fetchProfile, fetchActiveBettors])
 
   // Active bettors: Realtime + 30s polling
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function App() {
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username, balance: 1000 })
+      if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username, credits: 100, xp: 0 })
     }
     setLoading(false)
   }
@@ -87,12 +88,12 @@ export default function App() {
     if (error) alert("Erreur : " + error.message)
     else {
       alert(`✅ ${data.matchesProcessed} matchs traités, ${data.usersUpdated} joueurs mis à jour`)
-      if (user) fetchBalance(user.id)
+      if (user) fetchProfile(user.id)
     }
   }
 
   function onBalanceChange() {
-    if (user) fetchBalance(user.id)
+    if (user) fetchProfile(user.id)
   }
 
   if (user) return (
@@ -106,7 +107,7 @@ export default function App() {
         position: "sticky", top: 0, zIndex: 20,
         boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
       }}>
-        {/* Left: logo + balance + bettors */}
+        {/* Left: logo + credits + xp + bettors */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "22px" }}>⚽</span>
           <div>
@@ -114,13 +115,22 @@ export default function App() {
               CdM Paris 2026
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px", flexWrap: "wrap" }}>
-              {balance !== null && (
+              {credits !== null && (
                 <span style={{
                   fontSize: "11px", fontWeight: "800", color: "white",
                   background: "rgba(255,255,255,0.18)", borderRadius: "10px",
                   padding: "1px 7px",
                 }}>
-                  💰 {balance.toLocaleString("fr-FR")} pts
+                  💰 {credits.toLocaleString("fr-FR")} crédits
+                </span>
+              )}
+              {xp !== null && (
+                <span style={{
+                  fontSize: "11px", fontWeight: "800", color: "white",
+                  background: "rgba(255,255,255,0.13)", borderRadius: "10px",
+                  padding: "1px 7px",
+                }}>
+                  ⭐ {xp.toLocaleString("fr-FR")} XP
                 </span>
               )}
               {activeBettors !== null && activeBettors > 0 && (
@@ -155,11 +165,11 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  user={user} balance={balance} onBalanceChange={onBalanceChange} />}
-        {page === "combined" && <Combined user={user} balance={balance} onBalanceChange={onBalanceChange} />}
+        {page === "matches"  && <Matches  user={user} credits={credits} onBalanceChange={onBalanceChange} />}
+        {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
-        {page === "shop"     && <Shop     user={user} balance={balance} onBalanceChange={onBalanceChange} />}
+        {page === "shop"     && <Shop     user={user} credits={credits} onBalanceChange={onBalanceChange} />}
       </div>
 
       {/* Bottom nav */}

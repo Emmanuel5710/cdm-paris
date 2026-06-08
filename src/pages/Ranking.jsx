@@ -180,10 +180,10 @@ export default function Ranking({ user, onNavigate }) {
     async function load() {
       const { data } = await supabase
         .from("profiles")
-        .select("id, username, points_total")
+        .select("id, username, xp")
         .eq("id", user.id)
         .single()
-      if (data) setMyEntry({ ...data, points_total: data.points_total ?? 0 })
+      if (data) setMyEntry({ ...data, xp: data.xp ?? 0 })
       setLoading(false)
     }
     load()
@@ -212,7 +212,7 @@ export default function Ranking({ user, onNavigate }) {
       </div>
 
       {/* My rank card */}
-      {myEntry && <MyRankCard pts={myEntry.points_total} />}
+      {myEntry && <MyRankCard pts={myEntry.xp} />}
 
       {/* Ranks explainer */}
       <RanksExplainer />

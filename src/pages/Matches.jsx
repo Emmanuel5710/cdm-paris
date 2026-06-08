@@ -460,7 +460,7 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Matches({ user, balance, onBalanceChange }) {
+export default function Matches({ user, credits, onBalanceChange }) {
   const [matches, setMatches] = useState([])
   const [bets, setBets] = useState({})
   const [draftStakes, setDraftStakes] = useState({})
@@ -479,7 +479,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
   })
   const intervalRef = useRef(null)
 
-  const safeBalance = balance ?? 1000
+  const safeBalance = credits ?? 100
 
   // ── ESPN matches ────────────────────────────────────────────────────────────
   useEffect(() => { fetchMatches().finally(() => setLoading(false)) }, [])
@@ -570,7 +570,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
         ...(betType === "result" ? { stake, odds: liveOdds } : {}),
       })
       if (betType === "result" && stake > 0) {
-        await supabase.rpc("adjust_balance", { uid: user.id, delta: -stake })
+        await supabase.rpc("adjust_credits", { uid: user.id, delta: -stake })
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
         onBalanceChange?.()
@@ -587,7 +587,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
     if (betType === "result") {
       const stake = savedStakes[id] ?? 0
       if (stake > 0) {
-        await supabase.rpc("adjust_balance", { uid: user.id, delta: stake })
+        await supabase.rpc("adjust_credits", { uid: user.id, delta: stake })
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
         setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
         onBalanceChange?.()

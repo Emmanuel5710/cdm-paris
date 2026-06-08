@@ -20,7 +20,7 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function Shop({ user, balance, onBalanceChange }) {
+export default function Shop({ user, credits, onBalanceChange }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(null)  // pack id currently being purchased
@@ -31,7 +31,7 @@ export default function Shop({ user, balance, onBalanceChange }) {
   async function fetchProfile() {
     const { data } = await supabase
       .from("profiles")
-      .select("balance, last_purchase_date, daily_purchased")
+      .select("credits, last_purchase_date, daily_purchased")
       .eq("id", user.id).single()
     setProfile(data)
     setLoading(false)
@@ -57,7 +57,7 @@ export default function Shop({ user, balance, onBalanceChange }) {
     const base = isNewDay ? 0 : (profile.daily_purchased ?? 0)
     const newDailyPurchased = base + pack.amount
 
-    const { error: balErr } = await supabase.rpc("adjust_balance", { uid: user.id, delta: pack.amount })
+    const { error: balErr } = await supabase.rpc("adjust_credits", { uid: user.id, delta: pack.amount })
     if (balErr) {
       setMessage("Erreur lors de l'achat. Réessaie.")
       setBuying(null)
@@ -96,7 +96,7 @@ export default function Shop({ user, balance, onBalanceChange }) {
         <div style={{ fontSize: "18px", fontWeight: "800", color: C.text }}>🛍️ Boutique</div>
         <div style={{ fontSize: "13px", color: C.muted, marginTop: "4px" }}>
           Solde actuel :{" "}
-          <strong style={{ color: C.primary }}>{(balance ?? 0).toLocaleString("fr-FR")} pts</strong>
+          <strong style={{ color: C.primary }}>{(credits ?? 0).toLocaleString("fr-FR")} crédits</strong>
         </div>
       </div>
 
