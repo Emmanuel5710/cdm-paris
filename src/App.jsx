@@ -65,40 +65,17 @@ export default function App() {
     importMatches()
   }, [fetchActiveBettors])
 
-  // Load profile (credits, xp, username) whenever user changes
-  useEffect(() => {
-    if (!user || !user.id) return
-    supabase
-      .from("profiles")
-      .select("credits, xp, username")
-      .eq("id", user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) { console.error("Erreur chargement profil:", error); return }
-        if (data) {
-          setCredits(data.credits)
-          setXp(data.xp)
-          setUsername(data.username ?? "")
-        }
-      })
-  }, [user])
-
-  // Realtime: own profile credits + xp
   useEffect(() => {
     if (!user) return
-    const channel = supabase
-      .channel("profile")
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "profiles",
-        filter: `id=eq.${user.id}`,
-      }, (payload) => {
-        setCredits(payload.new.credits)
-        setXp(payload.new.xp)
-      })
+    // Charger le profil initial
+    supabase.from("profiles").select("credits, xp, username").eq("id", user.id).single()
+      .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp) } })
+    // Écouter les changements en temps réel
+    const channel = supabase.channel("profile-" + user.id)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + user.id },
+        (payload) => { setCredits(payload.new.credits); setXp(payload.new.xp) })
       .subscribe()
-    return () => supabase.removeChannel(channel)
+    return () => channel.unsubscribe()
   }, [user])
 
   // Active bettors: Realtime + 30s polling

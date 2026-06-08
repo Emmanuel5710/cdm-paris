@@ -508,10 +508,9 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     if (!user || !user.id) return
     supabase
       .from("bets")
-      .select("match_id, bet_type, bet_value, stake, odds, processed")
+      .select("match_id, bet_type, bet_value, stake, odds")
       .eq("user_id", user.id)
-      .then(({ data, error }) => {
-        if (error) { console.error("Erreur chargement paris:", error); return }
+      .then(({ data }) => {
         if (!data) return
         const map = {}, stakes = {}, oddsData = {}
         data.forEach(b => {
