@@ -23,8 +23,8 @@ const inp = {
 export default function App() {
   const [user, setUser] = useState(null)
   const [page, setPage] = useState("matches")
-  const [credits, setCredits] = useState(null)
-  const [xp, setXp] = useState(null)
+  const [credits, setCredits] = useState(0)
+  const [xp, setXp] = useState(0)
   const [activeBettors, setActiveBettors] = useState(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -60,7 +60,7 @@ export default function App() {
       const u = session?.user ?? null
       setUser(u)
       if (u) fetchActiveBettors()
-      else { setCredits(null); setXp(null); setUsername(""); setActiveBettors(null) }
+      else { setCredits(0); setXp(0); setUsername(""); setActiveBettors(null) }
     })
     importMatches()
   }, [fetchActiveBettors])
@@ -75,6 +75,7 @@ export default function App() {
         .eq("id", user.id)
         .single()
       console.log("profil chargé:", data, "erreur:", error)
+      console.log("credits:", data?.credits, "xp:", data?.xp)
       if (data) {
         setCredits(data.credits ?? 500)
         setXp(data.xp ?? 0)
@@ -194,14 +195,14 @@ export default function App() {
               background: "rgba(255,255,255,0.18)", borderRadius: "8px",
               padding: "2px 8px",
             }}>
-              💰 {(credits ?? 0).toLocaleString("fr-FR")} crédits
+              💰 {credits.toLocaleString("fr-FR")} crédits
             </span>
             <span style={{
               fontSize: "11px", fontWeight: "700", color: "white",
               background: "rgba(255,255,255,0.13)", borderRadius: "8px",
               padding: "2px 8px",
             }}>
-              ⭐ {(xp ?? 0).toLocaleString("fr-FR")} XP
+              ⭐ {xp.toLocaleString("fr-FR")} XP
             </span>
           </div>
         </div>
