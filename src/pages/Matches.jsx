@@ -527,6 +527,25 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       })
   }, [user])
 
+  useEffect(() => {
+    if (bets && Object.keys(bets).length > 0) return
+    if (!user?.id) return
+    const timer = setTimeout(() => {
+      supabase.from('bets').select('match_id, bet_type, bet_value, stake, odds').eq('user_id', user.id)
+        .then(({ data }) => {
+          if (!data || data.length === 0) return
+          const map = {}, stakes = {}, oddsData = {}
+          data.forEach(b => {
+            const mid = parseInt(b.match_id)
+            map[`${mid}-${b.bet_type}`] = b.bet_value
+            if (b.bet_type === 'result') { stakes[mid] = b.stake ?? 50; if (b.odds != null) oddsData[mid] = Number(b.odds) }
+          })
+          setBets(map); setSavedStakes(stakes); setSavedOdds(oddsData)
+        })
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [user?.id, Object.keys(bets).length])
+
   // ── Live odds: all result bets + Realtime + 30s polling ─────────────────────
   useEffect(() => {
     fetchAllResultBets()
