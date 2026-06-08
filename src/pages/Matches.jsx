@@ -940,7 +940,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "16px" }}>
-      {JOURNEES.filter(j => byJournee[j.id]?.length).map(j => {
+      {JOURNEES.filter(j => j.id !== "finale" && byJournee[j.id]?.length).map(j => {
         const sections = j.id !== "finale"
           ? GROUP_ORDER
               .filter(grp => byJourneeGroup[j.id]?.[grp]?.length)
