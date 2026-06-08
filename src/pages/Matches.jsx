@@ -670,9 +670,8 @@ export default function Matches({ user, balance, onBalanceChange }) {
           <div key={match.id}
             className={`card-enter ${isLive ? "card-live" : ""}`}
             style={{
-              padding: "14px 16px",
-              borderTop: idx > 0 ? `1px solid ${C.border}` : "none",
-              background: isLive ? "rgba(29,158,117,0.06)" : "transparent",
+              background: C.card, borderRadius: "16px", padding: "16px",
+              marginBottom: "12px", border: `1px solid ${isLive ? C.primary : C.border}`,
               animationDelay: `${idx * 0.05}s`,
             }}>
 
@@ -888,11 +887,8 @@ export default function Matches({ user, balance, onBalanceChange }) {
   }
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+    <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "16px" }}>
       {JOURNEES.filter(j => byJournee[j.id]?.length).map(j => {
-        const isExp = expandedJournees.has(j.id)
-        const jMatches = byJournee[j.id] || []
-
         const sections = j.id !== "finale"
           ? GROUP_ORDER
               .filter(grp => byJourneeGroup[j.id]?.[grp]?.length)
@@ -903,64 +899,33 @@ export default function Matches({ user, balance, onBalanceChange }) {
 
         return (
           <div key={j.id}>
-            {/* Journée banner — collapsible */}
-            <button onClick={() => toggleJournee(j.id)} style={{
-              width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "16px 20px", border: "none", cursor: "pointer",
-              background: isExp
-                ? "linear-gradient(135deg, #1D9E75 0%, #166d52 100%)"
-                : `linear-gradient(135deg, ${C.card} 0%, #1f2f3f 100%)`,
-              borderBottom: `2px solid ${isExp ? "#166d52" : C.border}`,
-              transition: "background 0.3s",
-            }}>
-              <div style={{ textAlign: "left" }}>
-                <div style={{
-                  fontSize: "18px", fontWeight: "900", letterSpacing: "1.2px",
-                  textTransform: "uppercase",
-                  color: isExp ? "white" : C.text,
-                }}>
-                  {j.label}
-                </div>
-                <div style={{ fontSize: "12px", marginTop: "2px", color: isExp ? "rgba(255,255,255,0.75)" : C.muted }}>
-                  {j.dates} · {jMatches.length} match{jMatches.length > 1 ? "s" : ""}
-                </div>
-              </div>
+            {/* Journée title */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "20px 16px 8px" }}>
               <span style={{
-                fontSize: "14px", color: isExp ? "rgba(255,255,255,0.85)" : C.muted,
-                display: "inline-block", transition: "transform 0.25s",
-                transform: isExp ? "rotate(180deg)" : "none",
-              }}>▼</span>
-            </button>
+                fontSize: "20px", fontWeight: "900", color: C.text,
+                textTransform: "uppercase", letterSpacing: "0.3px", flexShrink: 0,
+              }}>{j.label}</span>
+              <span style={{ fontSize: "11px", color: C.muted, flexShrink: 0 }}>{j.dates}</span>
+              <div style={{ flex: 1, height: "2px", background: `linear-gradient(90deg, ${C.border}, transparent)` }} />
+            </div>
 
-            {isExp && (
-              <div style={{ padding: "12px 16px 4px" }}>
-                {sections.map(({ key, label, matches: sm }) => (
-                  <div key={key} style={{
-                    background: C.card, borderRadius: "16px",
-                    border: `1px solid ${C.border}`,
-                    marginBottom: "12px", overflow: "hidden",
-                  }}>
-                    {/* Group / round header */}
-                    <div style={{
-                      background: `linear-gradient(90deg, rgba(29,158,117,0.18), rgba(29,158,117,0.04))`,
-                      borderBottom: `1px solid rgba(29,158,117,0.2)`,
-                      padding: "10px 16px",
-                      display: "flex", alignItems: "center", gap: "8px",
-                    }}>
-                      <span style={{
-                        fontSize: "12px", fontWeight: "900", color: C.primary,
-                        letterSpacing: "1.5px", textTransform: "uppercase",
-                      }}>{label}</span>
-                      <span style={{ fontSize: "11px", color: C.dim }}>
-                        · {sm.length} match{sm.length > 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    {/* Matches inside card */}
-                    {sm.map((match, idx) => renderMatchCard(match, idx))}
-                  </div>
-                ))}
+            {sections.map(({ key, label, matches: sm }) => (
+              <div key={key}>
+                {/* Group badge */}
+                <div style={{ padding: "2px 16px 8px" }}>
+                  <span style={{
+                    display: "inline-block", fontSize: "11px", fontWeight: "700",
+                    color: C.muted, background: C.card,
+                    border: `1px solid ${C.border}`, borderRadius: "20px",
+                    padding: "3px 10px", letterSpacing: "0.5px",
+                  }}>{label}</span>
+                </div>
+                {/* Match cards — unchanged */}
+                <div style={{ padding: "0 16px" }}>
+                  {sm.map((match, idx) => renderMatchCard(match, idx))}
+                </div>
               </div>
-            )}
+            ))}
           </div>
         )
       })}
