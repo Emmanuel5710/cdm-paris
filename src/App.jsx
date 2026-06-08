@@ -157,7 +157,7 @@ export default function App() {
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
         {page === "matches"  && <Matches  user={user} balance={balance} onBalanceChange={onBalanceChange} />}
         {page === "combined" && <Combined user={user} balance={balance} onBalanceChange={onBalanceChange} />}
-        {page === "ranking"  && <Ranking  user={user} />}
+        {page === "ranking"  && <Ranking  user={user} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
         {page === "shop"     && <Shop     user={user} balance={balance} onBalanceChange={onBalanceChange} />}
       </div>
