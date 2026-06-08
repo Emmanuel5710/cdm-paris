@@ -68,21 +68,18 @@ export default function App() {
   // Load profile (credits, xp, username) whenever user changes
   useEffect(() => {
     if (!user) return
-    async function loadProfile() {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("credits, xp, username")
-        .eq("id", user.id)
-        .single()
-      console.log("profil chargé:", data, "erreur:", error)
-      console.log("credits:", data?.credits, "xp:", data?.xp)
-      if (data) {
-        setCredits(data.credits ?? 500)
-        setXp(data.xp ?? 0)
-        setUsername(data.username ?? "")
-      }
-    }
-    loadProfile()
+    supabase
+      .from("profiles")
+      .select("credits, xp, username")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setCredits(data.credits)
+          setXp(data.xp)
+          setUsername(data.username ?? "")
+        }
+      })
   }, [user])
 
   // Realtime: own profile credits + xp

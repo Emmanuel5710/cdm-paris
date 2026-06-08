@@ -555,7 +555,7 @@ export default function Matches({ user, credits, onBalanceChange }) {
     const stake = betType === "result" ? getStake(id) : 0
     const liveOdds = betType === "result" ? (oddsMap[id]?.[betValue] ?? null) : null
 
-    if (betType === "result" && safeBalance - stake < MIN_BALANCE) return
+    // Credit check temporarily disabled
 
     const { data: existing } = await supabase
       .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType).maybeSingle()
@@ -661,7 +661,7 @@ export default function Matches({ user, credits, onBalanceChange }) {
         const isLocked = isLive || isFinished
         const isAdvancedOpen = expandedAdvanced.has(match.id)
         const stake = getStake(matchId)
-        const canBet = safeBalance > MIN_BALANCE
+        const canBet = true // credit check temporarily disabled
         const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
         const stakeMax = maxStake
         const matchOdds = oddsMap[matchId] ?? {}
