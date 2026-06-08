@@ -460,7 +460,7 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Matches({ user, credits, onBalanceChange }) {
+export default function Matches({ user, credits, onBalanceChange, onBetPlaced }) {
   const [matches, setMatches] = useState([])
   const [bets, setBets] = useState({})
   const [draftStakes, setDraftStakes] = useState({})
@@ -575,6 +575,7 @@ export default function Matches({ user, credits, onBalanceChange }) {
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
         onBalanceChange?.()
+        onBetPlaced?.()
       }
     }
 
@@ -593,6 +594,7 @@ export default function Matches({ user, credits, onBalanceChange }) {
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
         setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
         onBalanceChange?.()
+        onBetPlaced?.()
       }
     }
     setBets(prev => { const next = { ...prev }; delete next[`${id}-${betType}`]; return next })

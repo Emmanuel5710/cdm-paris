@@ -133,6 +133,18 @@ export default function App() {
     if (user) fetchProfile(user.id)
   }
 
+  async function refreshProfile() {
+    const { data } = await supabase
+      .from("profiles")
+      .select("credits, xp")
+      .eq("id", user.id)
+      .single()
+    if (data) {
+      setCredits(data.credits)
+      setXp(data.xp)
+    }
+  }
+
   if (user) return (
     <div style={{ background: C.bg, minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
 
@@ -207,7 +219,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  user={user} credits={credits} onBalanceChange={onBalanceChange} />}
+        {page === "matches"  && <Matches  user={user} credits={credits} onBalanceChange={onBalanceChange} onBetPlaced={refreshProfile} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
