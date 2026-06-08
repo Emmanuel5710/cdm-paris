@@ -57,8 +57,7 @@ export default function App() {
         data.forEach(b => { map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value })
         setAllBets(map)
       })
-  }, [user?.id])
-
+  }, [user])
   const fetchActiveBettors = useCallback(async () => {
     const { data } = await supabase.rpc("count_active_bettors")
     if (data != null) setActiveBettors(data)
@@ -68,7 +67,18 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) fetchActiveBettors()
+      if (u) {
+        fetchActiveBettors()
+        // Charger les paris immédiatement
+        supabase.from('bets').select('match_id, bet_type, bet_value, stake, odds')
+          .eq('user_id', u.id)
+          .then(({ data }) => {
+            if (!data) return
+            const map = {}
+            data.forEach(b => { map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value })
+            setAllBets(map)
+          })
+      }
       setAuthLoading(false)
     })
     supabase.auth.onAuthStateChange((_e, session) => {
@@ -221,7 +231,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  user={user} credits={credits} allBets={allBets} setAllBets={setAllBets} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
+        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} allBets={allBets} setAllBets={setAllBets} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
