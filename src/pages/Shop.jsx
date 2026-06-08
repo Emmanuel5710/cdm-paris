@@ -70,7 +70,7 @@ export default function Shop({ user, credits, onBalanceChange }) {
     }).eq("id", user.id)
 
     setProfile(p => ({ ...p, last_purchase_date: t, daily_purchased: newDailyPurchased }))
-    setMessage(`✓ +${pack.amount} points crédités sur ton solde !`)
+    setMessage(`✓ +${pack.amount} crédits ajoutés à ton solde !`)
     onBalanceChange?.()
     setBuying(null)
   }
@@ -94,9 +94,9 @@ export default function Shop({ user, credits, onBalanceChange }) {
         borderRadius: "16px", padding: "18px 20px", marginBottom: "16px",
       }}>
         <div style={{ fontSize: "18px", fontWeight: "800", color: C.text }}>🛍️ Boutique</div>
-        <div style={{ fontSize: "13px", color: C.muted, marginTop: "4px" }}>
-          Solde actuel :{" "}
-          <strong style={{ color: C.primary }}>{(credits ?? 0).toLocaleString("fr-FR")} crédits</strong>
+        <div style={{ fontSize: "15px", color: C.muted, marginTop: "6px" }}>
+          Votre solde :{" "}
+          <strong style={{ color: C.primary, fontSize: "17px" }}>💰 {(credits ?? 0).toLocaleString("fr-FR")} crédits</strong>
         </div>
       </div>
 
@@ -114,7 +114,7 @@ export default function Shop({ user, credits, onBalanceChange }) {
           <div style={{ fontSize: "13px", marginTop: "3px", fontWeight: "600", color: limitReached ? "#f87171" : C.text }}>
             {limitReached
               ? "Limite atteinte — reviens demain"
-              : `Il te reste ${remaining} point${remaining > 1 ? "s" : ""} à acheter aujourd'hui`
+              : `Il te reste ${remaining} crédit${remaining > 1 ? "s" : ""} à acheter aujourd'hui`
             }
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function Shop({ user, credits, onBalanceChange }) {
           <div style={{ fontSize: "22px", fontWeight: "800", color: limitReached ? "#f87171" : C.primary }}>
             {dailyPurchased}
           </div>
-          <div style={{ fontSize: "10px", color: C.dim }}>/ {DAILY_LIMIT} pts</div>
+          <div style={{ fontSize: "10px", color: C.dim }}>/ {DAILY_LIMIT} crédits</div>
         </div>
       </div>
 
@@ -154,7 +154,7 @@ export default function Shop({ user, credits, onBalanceChange }) {
             }}>
               <div>
                 <div style={{ fontSize: "22px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px" }}>
-                  {pack.amount} <span style={{ fontSize: "14px", fontWeight: "600", color: C.muted }}>points</span>
+                  {pack.amount} <span style={{ fontSize: "14px", fontWeight: "600", color: C.muted }}>crédits</span>
                 </div>
                 <div style={{ fontSize: "14px", fontWeight: "500", color: C.muted, marginTop: "2px" }}>
                   {pack.price}
@@ -205,10 +205,10 @@ export default function Shop({ user, credits, onBalanceChange }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
           {[
-            `Maximum ${DAILY_LIMIT} pts achetables par jour, peu importe le pack choisi`,
-            "Exemple : Pack Pro (50) + Pack Pro (50) = limite atteinte",
-            "Exemple : Pack Starter (20) + Pack Pro (50) = 30 pts restants",
-            "Le solde minimum est de 50 pts — impossible de descendre en dessous",
+            `Maximum ${DAILY_LIMIT} crédits achetables par jour, peu importe le pack`,
+            "Exemple : 50 crédits + 50 crédits = limite atteinte pour la journée",
+            "Exemple : 20 crédits + 50 crédits = 30 crédits restants à acheter",
+            "Le solde minimum pour parier est de 50 crédits",
           ].map((text, i) => (
             <div key={i} style={{ display: "flex", gap: "8px", fontSize: "12px", color: C.muted }}>
               <span style={{ color: C.primary, flexShrink: 0, fontWeight: "700" }}>·</span>
