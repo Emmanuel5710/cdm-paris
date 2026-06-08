@@ -22,6 +22,7 @@ const inp = {
 
 export default function App() {
   const [user, setUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [page, setPage] = useState("matches")
   const [credits, setCredits] = useState(0)
   const [xp, setXp] = useState(0)
@@ -52,9 +53,9 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
-      console.log("user:", u)
       setUser(u)
       if (u) fetchActiveBettors()
+      setAuthLoading(false)
     })
     supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
@@ -125,6 +126,12 @@ export default function App() {
       setXp(data.xp)
     }
   }
+
+  if (authLoading) return (
+    <div style={{ background: C.bg, minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span style={{ fontSize: "32px" }}>⚽</span>
+    </div>
+  )
 
   if (user) return (
     <div style={{ background: C.bg, minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
