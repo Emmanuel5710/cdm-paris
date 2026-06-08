@@ -234,12 +234,15 @@ export default function Combined({ user, balance, onBalanceChange }) {
   const mult = getMultiplier(selCount)
   const allPredicted = selCount >= 2 && [...selected].every(id => preds[id])
   const safeBalance = balance ?? 1000
-  const cappedStake = Math.max(10, Math.min(stake, safeBalance))
+  const MIN_BALANCE = 50
+  const canBet = safeBalance > MIN_BALANCE
+  const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
+  const cappedStake = Math.max(10, Math.min(stake, maxStake))
   const potentialGain = mult ? cappedStake * mult : 0
 
   async function validate() {
     if (!allPredicted || saving || !mult) return
-    if (cappedStake > safeBalance) { alert("Solde insuffisant pour cette mise."); return }
+    if (!canBet || safeBalance - cappedStake < MIN_BALANCE) { alert("Solde insuffisant — minimum 50 points requis"); return }
 
     setSaving(true)
 
@@ -489,26 +492,33 @@ export default function Combined({ user, balance, onBalanceChange }) {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <StakeInput value={stake} onChange={v => setStake(v)} min={10} max={safeBalance} label="Mise :" />
-              <div style={{ fontSize: "10px", color: C.dim, marginTop: "4px", paddingLeft: "40px" }}>
-                Solde : {safeBalance.toLocaleString("fr-FR")} pts · max {safeBalance} pts
-              </div>
+          {!canBet ? (
+            <div style={{ padding: "10px 12px", borderRadius: "10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", textAlign: "center" }}>
+              <div style={{ fontSize: "13px", color: "#f87171", fontWeight: "600" }}>Vous avez atteint le solde minimum.</div>
+              <div style={{ fontSize: "11px", color: C.dim, marginTop: "4px" }}>Achetez des points en boutique pour continuer.</div>
             </div>
-            <button onClick={validate} disabled={!allPredicted || saving} style={{
-              padding: "12px 18px", borderRadius: "30px", border: "none",
-              cursor: allPredicted && !saving ? "pointer" : "not-allowed",
-              background: allPredicted && !saving
-                ? `linear-gradient(135deg, ${C.primary}, #166d52)` : C.border,
-              color: allPredicted && !saving ? "white" : C.dim,
-              fontSize: "13px", fontWeight: "800", flexShrink: 0,
-              boxShadow: allPredicted ? "0 4px 16px rgba(29,158,117,0.35)" : "none",
-              transition: "all 0.2s",
-            }}>
-              {saving ? "Validation..." : "Valider ✓"}
-            </button>
-          </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <StakeInput value={stake} onChange={v => setStake(v)} min={10} max={maxStake} label="Mise :" />
+                <div style={{ fontSize: "10px", color: C.dim, marginTop: "4px", paddingLeft: "40px" }}>
+                  Solde : {safeBalance.toLocaleString("fr-FR")} pts · max {maxStake} pts (min. 50 réservés)
+                </div>
+              </div>
+              <button onClick={validate} disabled={!allPredicted || saving} style={{
+                padding: "12px 18px", borderRadius: "30px", border: "none",
+                cursor: allPredicted && !saving ? "pointer" : "not-allowed",
+                background: allPredicted && !saving
+                  ? `linear-gradient(135deg, ${C.primary}, #166d52)` : C.border,
+                color: allPredicted && !saving ? "white" : C.dim,
+                fontSize: "13px", fontWeight: "800", flexShrink: 0,
+                boxShadow: allPredicted ? "0 4px 16px rgba(29,158,117,0.35)" : "none",
+                transition: "all 0.2s",
+              }}>
+                {saving ? "Validation..." : "Valider ✓"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

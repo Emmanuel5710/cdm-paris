@@ -4,6 +4,7 @@ import Matches from "./pages/Matches"
 import Ranking from "./pages/Ranking"
 import League from "./pages/League"
 import Combined from "./pages/Combined"
+import Shop from "./pages/Shop"
 import { importMatches } from "./importMatches"
 
 const C = {
@@ -158,6 +159,7 @@ export default function App() {
         {page === "combined" && <Combined user={user} balance={balance} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} />}
         {page === "league"   && <League   user={user} />}
+        {page === "shop"     && <Shop     user={user} balance={balance} onBalanceChange={onBalanceChange} />}
       </div>
 
       {/* Bottom nav */}
@@ -172,6 +174,7 @@ export default function App() {
           { id: "combined", icon: "🎯", label: "Combiné"    },
           { id: "ranking",  icon: "🏆", label: "Classement" },
           { id: "league",   icon: "🤝", label: "Ma Ligue"   },
+          { id: "shop",     icon: "🛍️", label: "Boutique"   },
         ].map(tab => (
           <button key={tab.id} onClick={() => setPage(tab.id)} style={{
             flex: 1, display: "flex", flexDirection: "column",

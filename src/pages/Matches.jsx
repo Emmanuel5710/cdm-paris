@@ -12,6 +12,7 @@ const C = {
 }
 
 const DEFAULT_STAKE = 50
+const MIN_BALANCE = 50
 const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "yellow_card_team", "possession_home"]
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -462,7 +463,8 @@ export default function Matches({ user, balance, onBalanceChange }) {
   // ── Stake helpers ────────────────────────────────────────────────────────────
   function getStake(matchId) { return draftStakes[matchId] ?? DEFAULT_STAKE }
   function updateStake(matchId, value) {
-    setDraftStakes(prev => ({ ...prev, [matchId]: Math.max(10, Math.min(safeBalance, value)) }))
+    const max = Math.max(10, safeBalance - MIN_BALANCE)
+    setDraftStakes(prev => ({ ...prev, [matchId]: Math.max(10, Math.min(max, value)) }))
   }
 
   // ── Bet placement ────────────────────────────────────────────────────────────
@@ -472,8 +474,8 @@ export default function Matches({ user, balance, onBalanceChange }) {
     const stake = betType === "result" ? getStake(id) : 0
     const liveOdds = betType === "result" ? (oddsMap[id]?.[betValue] ?? null) : null
 
-    if (betType === "result" && stake > safeBalance) {
-      alert("Solde insuffisant pour cette mise.")
+    if (betType === "result" && safeBalance - stake < MIN_BALANCE) {
+      alert("Solde insuffisant — minimum 50 points requis")
       return
     }
 
@@ -550,7 +552,9 @@ export default function Matches({ user, balance, onBalanceChange }) {
         const isLocked = isLive || isFinished
         const isAdvancedOpen = expandedAdvanced.has(match.id)
         const stake = getStake(matchId)
-        const stakeMax = Math.max(10, safeBalance)
+        const canBet = safeBalance > MIN_BALANCE
+        const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
+        const stakeMax = maxStake
         const matchOdds = oddsMap[matchId] ?? {}
 
         const scorerCount = Object.keys(bets).filter(k => k.startsWith(`${matchId}-scorer_`)).length
@@ -652,6 +656,19 @@ export default function Matches({ user, balance, onBalanceChange }) {
                       background: C.cancel, border: `1px solid ${C.cancelText}44`,
                       color: C.cancelText, cursor: "pointer", fontSize: "11px", fontWeight: "700",
                     }}>✕ Annuler</button>
+                  </div>
+                ) : !canBet ? (
+                  <div style={{
+                    padding: "12px 14px", borderRadius: "10px",
+                    background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
+                    textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: "13px", color: "#f87171", fontWeight: "600" }}>
+                      Vous avez atteint le solde minimum.
+                    </div>
+                    <div style={{ fontSize: "11px", color: C.dim, marginTop: "4px" }}>
+                      Achetez des points en boutique pour continuer à parier.
+                    </div>
                   </div>
                 ) : (
                   /* No bet — prediction buttons with live odds + stake */
