@@ -67,13 +67,14 @@ export default function App() {
 
   // Load profile (credits, xp, username) whenever user changes
   useEffect(() => {
-    if (!user) return
+    if (!user || !user.id) return
     supabase
       .from("profiles")
       .select("credits, xp, username")
       .eq("id", user.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { console.error("Erreur chargement profil:", error); return }
         if (data) {
           setCredits(data.credits)
           setXp(data.xp)

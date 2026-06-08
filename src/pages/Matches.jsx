@@ -505,19 +505,20 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
 
   // ── User's bets — loaded at startup and whenever user changes ───────────────
   useEffect(() => {
-    if (!user?.id) return
+    if (!user || !user.id) return
     supabase
       .from("bets")
       .select("match_id, bet_type, bet_value, stake, odds, processed")
       .eq("user_id", user.id)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { console.error("Erreur chargement paris:", error); return }
         if (!data) return
         const map = {}, stakes = {}, oddsData = {}
         data.forEach(b => {
           const mid = parseInt(b.match_id)
           map[`${mid}-${b.bet_type}`] = b.bet_value
           if (b.bet_type === "result") {
-            stakes[mid] = b.stake ?? DEFAULT_STAKE
+            stakes[mid] = b.stake ?? 50
             if (b.odds != null) oddsData[mid] = Number(b.odds)
           }
         })
@@ -525,7 +526,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         setSavedStakes(stakes)
         setSavedOdds(oddsData)
       })
-  }, [user?.id])
+  }, [user])
 
   // ── Live odds: all result bets + Realtime + 30s polling ─────────────────────
   useEffect(() => {
