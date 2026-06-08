@@ -103,10 +103,7 @@ function parseMatches(data) {
       home: { name: home?.team?.displayName ?? "", logo: home?.team?.logo ?? "", score: home?.score ?? "0", form: home?.form ?? "" },
       away: { name: away?.team?.displayName ?? "", logo: away?.team?.logo ?? "", score: away?.score ?? "0", form: away?.form ?? "" },
     }
-  }).filter(m =>
-    m.journee !== "finale" ||
-    !/(winner|runner.?up|tbd)/i.test(`${m.home.name} ${m.away.name}`)
-  )
+  })
 }
 
 function FormDots({ form }) {
@@ -682,6 +679,44 @@ export default function Matches({ user, balance, onBalanceChange }) {
         const lockedOdds = savedOdds[matchId] ?? null
         const lockedStake = savedStakes[matchId] ?? DEFAULT_STAKE
         const lockedGain = lockedOdds ? Math.round(lockedStake * lockedOdds) : lockedStake * 2
+
+        if (/(winner|runner.?up|tbd)/i.test(`${match.home.name} ${match.away.name}`)) {
+          return (
+            <div key={match.id} style={{
+              background: C.card, borderRadius: "16px", padding: "16px",
+              marginBottom: "12px", border: `1px solid ${C.border}`,
+              animationDelay: `${idx * 0.05}s`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                <span style={{
+                  fontSize: "11px", fontWeight: "700", padding: "4px 10px", borderRadius: "20px",
+                  background: C.primaryGlow, color: C.primary,
+                  letterSpacing: "0.3px", textTransform: "uppercase",
+                }}>
+                  {formatFrenchDate(match.date)}
+                </span>
+                {match.venue && (
+                  <div style={{ textAlign: "right", marginLeft: "8px" }}>
+                    <div style={{ fontSize: "11px", color: C.muted }}>🏟 {match.venue}</div>
+                    <div style={{ fontSize: "10px", color: C.dim }}>{match.city}</div>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+                  <span style={{ fontSize: "26px", fontWeight: "900", color: C.dim }}>?</span>
+                </div>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: C.dim, letterSpacing: "2px", padding: "0 8px" }}>VS</span>
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: "26px", fontWeight: "900", color: C.dim }}>?</span>
+                </div>
+              </div>
+              <div style={{ textAlign: "center", marginTop: "10px", fontSize: "11px", color: C.dim, fontStyle: "italic" }}>
+                Équipes à déterminer après la phase de groupes
+              </div>
+            </div>
+          )
+        }
 
         return (
           <div key={match.id}
