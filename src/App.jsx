@@ -63,14 +63,13 @@ export default function App() {
   // Realtime: own profile credits + xp
   useEffect(() => {
     if (!user) return
-    const ch = supabase.channel(`profile-${user.id}`)
+    const ch = supabase.channel("profile-changes")
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "profiles",
         filter: `id=eq.${user.id}`,
-      }, payload => {
-        const d = payload.new
-        if (d.credits !== undefined) setCredits(d.credits)
-        if (d.xp      !== undefined) setXp(d.xp)
+      }, (payload) => {
+        setCredits(payload.new.credits)
+        setXp(payload.new.xp)
       })
       .subscribe()
     return () => supabase.removeChannel(ch)
