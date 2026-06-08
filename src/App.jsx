@@ -36,8 +36,12 @@ export default function App() {
 
   const fetchProfile = useCallback(async (uid) => {
     const { data } = await supabase
-      .from("profiles").select("credits, xp").eq("id", uid).single()
-    if (data) { setCredits(data.credits ?? 100); setXp(data.xp ?? 0) }
+      .from("profiles").select("credits, xp, username").eq("id", uid).single()
+    if (data) {
+      setCredits(data.credits ?? 500)
+      setXp(data.xp ?? 0)
+      setUsername(data.username ?? "")
+    }
   }, [])
 
   const fetchActiveBettors = useCallback(async () => {
@@ -49,16 +53,34 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) { fetchProfile(u.id); fetchActiveBettors() }
+      if (u) fetchActiveBettors()
     })
     supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) { fetchProfile(u.id); fetchActiveBettors() }
-      else { setCredits(null); setXp(null); setActiveBettors(null) }
+      if (u) fetchActiveBettors()
+      else { setCredits(null); setXp(null); setUsername(""); setActiveBettors(null) }
     })
     importMatches()
-  }, [fetchProfile, fetchActiveBettors])
+  }, [fetchActiveBettors])
+
+  // Load profile (credits, xp, username) whenever user changes
+  useEffect(() => {
+    if (!user) return
+    async function loadProfile() {
+      const { data } = await supabase
+        .from("profiles")
+        .select("credits, xp, username")
+        .eq("id", user.id)
+        .single()
+      if (data) {
+        setCredits(data.credits)
+        setXp(data.xp)
+        setUsername(data.username)
+      }
+    }
+    loadProfile()
+  }, [user])
 
   // Realtime: own profile credits + xp
   useEffect(() => {
@@ -122,15 +144,20 @@ export default function App() {
         position: "sticky", top: 0, zIndex: 20,
         boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
       }}>
-        {/* Left: logo + title + bettors */}
+        {/* Left: logo + title + username + bettors */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "22px" }}>⚽</span>
           <div>
             <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>
               CdM Paris 2026
             </div>
-            {activeBettors !== null && activeBettors > 0 && (
-              <div style={{ marginTop: "2px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px", flexWrap: "wrap" }}>
+              {username && (
+                <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.9)", fontWeight: "600" }}>
+                  👤 {username}
+                </span>
+              )}
+              {activeBettors !== null && activeBettors > 0 && (
                 <span style={{
                   fontSize: "10px", fontWeight: "600", color: "rgba(255,255,255,0.85)",
                   background: "rgba(255,255,255,0.12)", borderRadius: "10px",
@@ -138,8 +165,8 @@ export default function App() {
                 }}>
                   👥 {activeBettors} parieur{activeBettors > 1 ? "s" : ""}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
