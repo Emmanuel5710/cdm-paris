@@ -460,12 +460,14 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Matches({ user, credits, initialBets, onBalanceChange, onBetPlaced }) {
+export default function Matches({ user, credits, allBets, setAllBets, onBalanceChange, onBetPlaced }) {
+  const bets = allBets ?? {}
+  const setBets = setAllBets
+
   const [matches, setMatches] = useState([])
-  const [bets, setBets] = useState(initialBets?.bets ?? {})
   const [draftStakes, setDraftStakes] = useState({})
-  const [savedStakes, setSavedStakes] = useState(initialBets?.stakes ?? {})
-  const [savedOdds, setSavedOdds] = useState(initialBets?.odds ?? {})    // { matchId: odds at time of bet }
+  const [savedStakes, setSavedStakes] = useState({})
+  const [savedOdds, setSavedOdds] = useState({})    // { matchId: odds at time of bet }
   const [oddsMap, setOddsMap] = useState({})         // { matchId: { home, draw, away } } — live
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -478,14 +480,6 @@ export default function Matches({ user, credits, initialBets, onBalanceChange, o
     return new Set(["finale"])
   })
   const intervalRef = useRef(null)
-
-  // Sync bets from App-level prop when they change (e.g. after refresh)
-  useEffect(() => {
-    if (!initialBets) return
-    if (initialBets.bets) setBets(initialBets.bets)
-    if (initialBets.stakes) setSavedStakes(initialBets.stakes)
-    if (initialBets.odds) setSavedOdds(initialBets.odds)
-  }, [initialBets])
 
   // Local credits mirrors the App prop but updates optimistically on bet placement
   const [localCredits, setLocalCredits] = useState(credits ?? 500)

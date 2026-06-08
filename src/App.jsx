@@ -25,7 +25,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [page, setPage] = useState("matches")
-  const [allBets, setAllBets] = useState({ bets: {}, stakes: {}, odds: {} })
+  const [allBets, setAllBets] = useState({})
   const [credits, setCredits] = useState(0)
   const [xp, setXp] = useState(0)
   const [activeBettors, setActiveBettors] = useState(null)
@@ -47,22 +47,17 @@ export default function App() {
     }
   }, [])
 
-  const loadBets = useCallback(async (uid) => {
-    const { data } = await supabase.from("bets")
-      .select("match_id, bet_type, bet_value, stake, odds")
-      .eq("user_id", uid)
-    if (!data) return
-    const bets = {}, stakes = {}, odds = {}
-    data.forEach(b => {
-      const mid = parseInt(b.match_id)
-      bets[`${mid}-${b.bet_type}`] = b.bet_value
-      if (b.bet_type === "result") {
-        stakes[mid] = b.stake ?? 50
-        if (b.odds != null) odds[mid] = Number(b.odds)
-      }
-    })
-    setAllBets({ bets, stakes, odds })
-  }, [])
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('bets').select('match_id, bet_type, bet_value, stake, odds')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach(b => { map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value })
+        setAllBets(map)
+      })
+  }, [user?.id])
 
   const fetchActiveBettors = useCallback(async () => {
     const { data } = await supabase.rpc("count_active_bettors")
@@ -87,7 +82,6 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return
-    loadBets(user.id)
     // Charger le profil initial
     supabase.from("profiles").select("credits, xp, username").eq("id", user.id).single()
       .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp); setUsername(data.username ?? "") } })
@@ -97,7 +91,7 @@ export default function App() {
         (payload) => { setCredits(payload.new.credits); setXp(payload.new.xp) })
       .subscribe()
     return () => channel.unsubscribe()
-  }, [user, loadBets])
+  }, [user])
 
   // Active bettors: Realtime + 30s polling
   useEffect(() => {
@@ -227,7 +221,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} initialBets={allBets} onBalanceChange={refreshProfile} onBetPlaced={() => { refreshProfile(); loadBets(user.id) }} />}
+        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} allBets={allBets} setAllBets={setAllBets} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
