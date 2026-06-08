@@ -52,6 +52,7 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
+      console.log("user:", u)
       setUser(u)
       if (u) fetchActiveBettors()
     })
@@ -68,15 +69,16 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     async function loadProfile() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .select("credits, xp, username")
         .eq("id", user.id)
         .single()
+      console.log("profil chargé:", data, "erreur:", error)
       if (data) {
-        setCredits(data.credits)
-        setXp(data.xp)
-        setUsername(data.username)
+        setCredits(data.credits ?? 500)
+        setXp(data.xp ?? 0)
+        setUsername(data.username ?? "")
       }
     }
     loadProfile()
