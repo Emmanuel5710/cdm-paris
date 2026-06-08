@@ -221,7 +221,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} allBets={allBets} setAllBets={setAllBets} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
+        {page === "matches"  && <Matches  user={user} credits={credits} allBets={allBets} setAllBets={setAllBets} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
