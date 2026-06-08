@@ -94,7 +94,7 @@ export default function App() {
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) { setError(error.message); setLoading(false); return }
-      if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username, credits: 100, xp: 0 })
+      if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username, credits: 500, xp: 0 })
     }
     setLoading(false)
   }

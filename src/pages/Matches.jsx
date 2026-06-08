@@ -479,7 +479,10 @@ export default function Matches({ user, credits, onBalanceChange }) {
   })
   const intervalRef = useRef(null)
 
-  const safeBalance = credits ?? 100
+  // Local credits mirrors the App prop but updates optimistically on bet placement
+  const [localCredits, setLocalCredits] = useState(credits ?? 500)
+  useEffect(() => { if (credits !== null && credits !== undefined) setLocalCredits(credits) }, [credits])
+  const safeBalance = localCredits
 
   // ── ESPN matches ────────────────────────────────────────────────────────────
   useEffect(() => { fetchMatches().finally(() => setLoading(false)) }, [])
@@ -567,6 +570,7 @@ export default function Matches({ user, credits, onBalanceChange }) {
         ...(betType === "result" ? { stake, odds: liveOdds } : {}),
       })
       if (betType === "result" && stake > 0) {
+        setLocalCredits(prev => prev - stake)          // optimistic — instant UI
         await supabase.rpc("adjust_credits", { uid: user.id, delta: -stake })
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
@@ -584,6 +588,7 @@ export default function Matches({ user, credits, onBalanceChange }) {
     if (betType === "result") {
       const stake = savedStakes[id] ?? 0
       if (stake > 0) {
+        setLocalCredits(prev => prev + stake)          // optimistic — instant UI
         await supabase.rpc("adjust_credits", { uid: user.id, delta: stake })
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
         setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
