@@ -172,7 +172,7 @@ function ComingSoon({ onNavigate }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Ranking({ user, onNavigate }) {
+export default function Ranking({ user, xp: xpProp, onNavigate }) {
   const [myEntry, setMyEntry] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -188,6 +188,13 @@ export default function Ranking({ user, onNavigate }) {
     }
     load()
   }, [user.id])
+
+  // Keep myEntry.xp in sync with the real-time prop from App
+  useEffect(() => {
+    if (xpProp !== null && xpProp !== undefined && myEntry) {
+      setMyEntry(e => ({ ...e, xp: xpProp }))
+    }
+  }, [xpProp])
 
   if (loading) return (
     <div style={{ padding: "3rem", textAlign: "center", color: C.muted }}>

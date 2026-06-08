@@ -60,6 +60,22 @@ export default function App() {
     importMatches()
   }, [fetchProfile, fetchActiveBettors])
 
+  // Realtime: own profile credits + xp
+  useEffect(() => {
+    if (!user) return
+    const ch = supabase.channel(`profile-${user.id}`)
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "profiles",
+        filter: `id=eq.${user.id}`,
+      }, payload => {
+        const d = payload.new
+        if (d.credits !== undefined) setCredits(d.credits)
+        if (d.xp      !== undefined) setXp(d.xp)
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [user])
+
   // Active bettors: Realtime + 30s polling
   useEffect(() => {
     if (!user) return
@@ -107,33 +123,15 @@ export default function App() {
         position: "sticky", top: 0, zIndex: 20,
         boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
       }}>
-        {/* Left: logo + credits + xp + bettors */}
+        {/* Left: logo + title + bettors */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "22px" }}>⚽</span>
           <div>
             <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>
               CdM Paris 2026
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px", flexWrap: "wrap" }}>
-              {credits !== null && (
-                <span style={{
-                  fontSize: "11px", fontWeight: "800", color: "white",
-                  background: "rgba(255,255,255,0.18)", borderRadius: "10px",
-                  padding: "1px 7px",
-                }}>
-                  💰 {credits.toLocaleString("fr-FR")} crédits
-                </span>
-              )}
-              {xp !== null && (
-                <span style={{
-                  fontSize: "11px", fontWeight: "800", color: "white",
-                  background: "rgba(255,255,255,0.13)", borderRadius: "10px",
-                  padding: "1px 7px",
-                }}>
-                  ⭐ {xp.toLocaleString("fr-FR")} XP
-                </span>
-              )}
-              {activeBettors !== null && activeBettors > 0 && (
+            {activeBettors !== null && activeBettors > 0 && (
+              <div style={{ marginTop: "2px" }}>
                 <span style={{
                   fontSize: "10px", fontWeight: "600", color: "rgba(255,255,255,0.85)",
                   background: "rgba(255,255,255,0.12)", borderRadius: "10px",
@@ -141,25 +139,43 @@ export default function App() {
                 }}>
                   👥 {activeBettors} parieur{activeBettors > 1 ? "s" : ""}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right: actions */}
-        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          {user.email === "emmanuelfayard57@gmail.com" && (
-            <button onClick={handleCalculatePoints} style={{
-              padding: "6px 12px", borderRadius: "20px", cursor: "pointer",
-              fontSize: "11px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
-              background: "rgba(255,255,255,0.15)", color: "white",
-            }}>⚙️ Pts</button>
-          )}
-          <button onClick={() => supabase.auth.signOut()} style={{
-            padding: "6px 14px", borderRadius: "20px", cursor: "pointer",
-            fontSize: "12px", fontWeight: "500", border: "1px solid rgba(255,255,255,0.3)",
-            background: "rgba(255,255,255,0.1)", color: "white",
-          }}>Quitter</button>
+        {/* Right: credits + xp + actions */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px" }}>
+          <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+            {user.email === "emmanuelfayard57@gmail.com" && (
+              <button onClick={handleCalculatePoints} style={{
+                padding: "5px 10px", borderRadius: "20px", cursor: "pointer",
+                fontSize: "11px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
+                background: "rgba(255,255,255,0.15)", color: "white",
+              }}>⚙️ Pts</button>
+            )}
+            <button onClick={() => supabase.auth.signOut()} style={{
+              padding: "5px 12px", borderRadius: "20px", cursor: "pointer",
+              fontSize: "12px", fontWeight: "500", border: "1px solid rgba(255,255,255,0.3)",
+              background: "rgba(255,255,255,0.1)", color: "white",
+            }}>Quitter</button>
+          </div>
+          <div style={{ display: "flex", gap: "4px" }}>
+            <span style={{
+              fontSize: "11px", fontWeight: "700", color: "white",
+              background: "rgba(255,255,255,0.18)", borderRadius: "8px",
+              padding: "2px 8px",
+            }}>
+              💰 {(credits ?? 0).toLocaleString("fr-FR")} crédits
+            </span>
+            <span style={{
+              fontSize: "11px", fontWeight: "700", color: "white",
+              background: "rgba(255,255,255,0.13)", borderRadius: "8px",
+              padding: "2px 8px",
+            }}>
+              ⭐ {(xp ?? 0).toLocaleString("fr-FR")} XP
+            </span>
+          </div>
         </div>
       </div>
 
@@ -167,7 +183,7 @@ export default function App() {
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
         {page === "matches"  && <Matches  user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
-        {page === "ranking"  && <Ranking  user={user} onNavigate={setPage} />}
+        {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
         {page === "shop"     && <Shop     user={user} credits={credits} onBalanceChange={onBalanceChange} />}
       </div>

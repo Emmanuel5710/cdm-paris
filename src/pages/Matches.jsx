@@ -809,10 +809,10 @@ export default function Matches({ user, credits, onBalanceChange }) {
                     textAlign: "center",
                   }}>
                     <div style={{ fontSize: "13px", color: "#f87171", fontWeight: "600" }}>
-                      Vous avez atteint le solde minimum.
+                      Crédits insuffisants (minimum 50 requis).
                     </div>
                     <div style={{ fontSize: "11px", color: C.dim, marginTop: "4px" }}>
-                      Achetez des points en boutique pour continuer à parier.
+                      Achetez des crédits en boutique pour continuer à parier.
                     </div>
                   </div>
                 ) : (
@@ -875,8 +875,13 @@ export default function Matches({ user, credits, onBalanceChange }) {
                       border: `1px solid ${C.border}`,
                     }}>
                       <StakeStepper value={stake} onChange={v => updateStake(matchId, v)} max={stakeMax} />
-                      <div style={{ fontSize: "10px", color: C.dim, textAlign: "center", marginTop: "5px" }}>
-                        Cliquez sur un résultat pour parier · Gain = mise × cote · Perte = mise
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px" }}>
+                        <span style={{ fontSize: "10px", color: C.dim }}>
+                          Gain = mise × cote · Perte = mise
+                        </span>
+                        <span style={{ fontSize: "10px", color: C.primary, fontWeight: "600" }}>
+                          💰 {safeBalance} crédits
+                        </span>
                       </div>
                     </div>
                   </>
