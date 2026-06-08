@@ -460,9 +460,9 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Matches({ user, credits, allBets, setAllBets, onBalanceChange, onBetPlaced }) {
-  const bets = allBets ?? {}
-  const setBets = setAllBets
+export default function Matches(props) {
+  const { user, credits, onBalanceChange, onBetPlaced } = props
+  const [bets, setBets] = [props.allBets ?? {}, props.setAllBets]
 
   const [matches, setMatches] = useState([])
   const [draftStakes, setDraftStakes] = useState({})
