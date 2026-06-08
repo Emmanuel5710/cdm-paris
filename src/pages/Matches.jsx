@@ -503,28 +503,29 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     } catch { setError("Impossible de charger les matchs ESPN.") }
   }
 
-  // ── User's bets ─────────────────────────────────────────────────────────────
+  // ── User's bets — loaded at startup and whenever user changes ───────────────
   useEffect(() => {
-    if (!user) return
-    async function loadBets() {
-      const { data } = await supabase
-        .from("bets").select("match_id, bet_type, bet_value, stake, odds").eq("user_id", user.id)
-      if (data) {
+    if (!user?.id) return
+    supabase
+      .from("bets")
+      .select("match_id, bet_type, bet_value, stake, odds, processed")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (!data) return
         const map = {}, stakes = {}, oddsData = {}
         data.forEach(b => {
-          map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value
+          const mid = parseInt(b.match_id)
+          map[`${mid}-${b.bet_type}`] = b.bet_value
           if (b.bet_type === "result") {
-            stakes[parseInt(b.match_id)] = b.stake ?? DEFAULT_STAKE
-            if (b.odds != null) oddsData[parseInt(b.match_id)] = Number(b.odds)
+            stakes[mid] = b.stake ?? DEFAULT_STAKE
+            if (b.odds != null) oddsData[mid] = Number(b.odds)
           }
         })
         setBets(map)
         setSavedStakes(stakes)
         setSavedOdds(oddsData)
-      }
-    }
-    loadBets()
-  }, [user])
+      })
+  }, [user?.id])
 
   // ── Live odds: all result bets + Realtime + 30s polling ─────────────────────
   useEffect(() => {

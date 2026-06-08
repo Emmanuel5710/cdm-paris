@@ -85,16 +85,19 @@ export default function App() {
   // Realtime: own profile credits + xp
   useEffect(() => {
     if (!user) return
-    const ch = supabase.channel("profile-changes")
+    const channel = supabase
+      .channel("profile")
       .on("postgres_changes", {
-        event: "UPDATE", schema: "public", table: "profiles",
+        event: "UPDATE",
+        schema: "public",
+        table: "profiles",
         filter: `id=eq.${user.id}`,
       }, (payload) => {
         setCredits(payload.new.credits)
         setXp(payload.new.xp)
       })
       .subscribe()
-    return () => supabase.removeChannel(ch)
+    return () => supabase.removeChannel(channel)
   }, [user])
 
   // Active bettors: Realtime + 30s polling
