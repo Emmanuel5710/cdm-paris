@@ -11,9 +11,9 @@ const C = {
 const DAILY_LIMIT = 100
 
 const PACKS = [
-  { id: "starter", label: "Pack Starter", amount: 20,  icon: "🥉", color: "#94a3b8" },
-  { id: "pro",     label: "Pack Pro",     amount: 50,  icon: "🥈", color: "#f59e0b" },
-  { id: "max",     label: "Pack Max",     amount: 100, icon: "🥇", color: "#1D9E75" },
+  { id: "starter", amount: 20,  price: "0,99 €" },
+  { id: "pro",     amount: 50,  price: "1,99 €" },
+  { id: "max",     amount: 100, price: "2,99 €" },
 ]
 
 function today() {
@@ -146,51 +146,33 @@ export default function Shop({ user, balance, onBalanceChange }) {
           return (
             <div key={pack.id} style={{
               background: C.card,
-              border: `1px solid ${canBuy ? C.border : C.border}`,
-              borderRadius: "14px", padding: "16px 18px",
-              display: "flex", alignItems: "center", gap: "14px",
-              opacity: !canBuy && !isLoading ? 0.5 : 1,
+              border: `1px solid ${C.border}`,
+              borderRadius: "14px", padding: "18px 20px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              opacity: !canBuy && !isLoading ? 0.45 : 1,
               transition: "opacity 0.2s",
             }}>
-              {/* Icon */}
-              <div style={{ fontSize: "30px", flexShrink: 0 }}>{pack.icon}</div>
-
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: C.text }}>{pack.label}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "18px", fontWeight: "800", color: pack.color }}>
-                    +{pack.amount} pts
-                  </span>
-                  <span style={{
-                    fontSize: "10px", color: C.primary, fontWeight: "700",
-                    background: C.primaryGlow, border: `1px solid ${C.primary}33`,
-                    borderRadius: "20px", padding: "1px 8px",
-                  }}>
-                    Gratuit pendant la bêta
-                  </span>
+              <div>
+                <div style={{ fontSize: "22px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px" }}>
+                  {pack.amount} <span style={{ fontSize: "14px", fontWeight: "600", color: C.muted }}>points</span>
                 </div>
-                {!canBuy && !isLoading && remaining > 0 && (
-                  <div style={{ fontSize: "10px", color: C.dim, marginTop: "3px" }}>
-                    Quota insuffisant — il te reste {remaining} pt{remaining > 1 ? "s" : ""}
-                  </div>
-                )}
+                <div style={{ fontSize: "14px", fontWeight: "500", color: C.muted, marginTop: "2px" }}>
+                  {pack.price}
+                </div>
               </div>
-
-              {/* Button */}
               <button
                 onClick={() => canBuy && handleBuy(pack)}
                 disabled={!canBuy || isLoading}
                 style={{
-                  padding: "9px 18px", borderRadius: "30px", border: "none", flexShrink: 0,
+                  padding: "10px 22px", borderRadius: "30px", border: "none", flexShrink: 0,
                   background: canBuy
                     ? `linear-gradient(135deg, ${C.primary}, #166d52)` : C.inner,
                   color: canBuy ? "white" : C.dim,
-                  fontSize: "12px", fontWeight: "700",
+                  fontSize: "13px", fontWeight: "700",
                   cursor: canBuy ? "pointer" : "not-allowed",
                   boxShadow: canBuy ? "0 3px 12px rgba(29,158,117,0.3)" : "none",
                   transition: "all 0.2s",
-                  minWidth: "76px",
+                  minWidth: "80px",
                 }}>
                 {isLoading ? "..." : "Acheter"}
               </button>
