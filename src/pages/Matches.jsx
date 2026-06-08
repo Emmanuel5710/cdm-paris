@@ -17,6 +17,43 @@ const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "yellow
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
+function getGroup(ev) {
+  const groups = ev.competitions?.[0]?.groups
+  if (groups?.length) {
+    const g = groups[0].shortName ?? groups[0].name ?? ""
+    const m = g.match(/([A-L])/i)
+    if (m) return `Groupe ${m[1].toUpperCase()}`
+  }
+  const seasonType = ev.season?.type?.name ?? ""
+  if (/round|semi|final|quarter|knockout|playoff/i.test(seasonType)) return "Phase finale"
+  const notes = ev.competitions?.[0]?.notes?.[0]?.headline ?? ""
+  const mn = notes.match(/Group\s+([A-L])/i)
+  if (mn) return `Groupe ${mn[1].toUpperCase()}`
+  return "Phase finale"
+}
+
+function getJournee(isoDate) {
+  if (!isoDate) return "Phase finale"
+  const d = new Date(isoDate)
+  if (d < new Date("2026-06-16T00:00:00Z")) return "Journée 1"
+  if (d < new Date("2026-06-21T00:00:00Z")) return "Journée 2"
+  if (d < new Date("2026-06-26T00:00:00Z")) return "Journée 3"
+  return "Phase finale"
+}
+
+function formatFrenchDate(iso) {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return d.toLocaleString("fr-FR", {
+    timeZone: "Europe/Paris",
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  })
+    .replace(/^(.)/, c => c.toUpperCase())
+    .replace(/,\s*/, " à ")
+    .replace(/(\d{2}):(\d{2})/, "$1h$2")
+}
+
 function parseMatches(data) {
   return (data.events || []).map(ev => {
     const comp = ev.competitions?.[0]
@@ -24,9 +61,11 @@ function parseMatches(data) {
     const away = comp?.competitors?.find(c => c.homeAway === "away")
     return {
       id: ev.id,
+      date: ev.date ?? null,
+      group: getGroup(ev),
+      journee: getJournee(ev.date),
       state: comp?.status?.type?.state,
       displayClock: comp?.status?.displayClock,
-      statusDetail: comp?.status?.type?.shortDetail,
       venue: comp?.venue?.fullName,
       city: comp?.venue?.address?.city,
       home: { name: home?.team?.displayName ?? "", logo: home?.team?.logo ?? "", score: home?.score ?? "0", form: home?.form ?? "" },
@@ -399,6 +438,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
+  const [filter, setFilter] = useState("Tous")
   const intervalRef = useRef(null)
 
   const safeBalance = balance ?? 1000
@@ -542,9 +582,68 @@ export default function Matches({ user, balance, onBalanceChange }) {
     </div>
   )
 
+  const GROUP_FILTERS = ["Tous","Groupe A","Groupe B","Groupe C","Groupe D","Groupe E","Groupe F","Groupe G","Groupe H","Groupe I","Groupe J","Groupe K","Groupe L","Phase finale"]
+  const availableGroups = new Set(matches.map(m => m.group))
+  const visibleFilters = GROUP_FILTERS.filter(f => f === "Tous" || availableGroups.has(f))
+  const filteredMatches = filter === "Tous" ? matches : matches.filter(m => m.group === filter)
+  const JOURNEE_ORDER = ["Journée 1", "Journée 2", "Journée 3", "Phase finale"]
+  const matchesByJournee = {}
+  for (const m of filteredMatches) {
+    if (!matchesByJournee[m.journee]) matchesByJournee[m.journee] = []
+    matchesByJournee[m.journee].push(m)
+  }
+
   return (
-    <div style={{ padding: "16px", maxWidth: "600px", margin: "0 auto" }}>
-      {matches.map((match, idx) => {
+    <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+
+      {/* Filter buttons — sticky, horizontal scroll on mobile */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 10,
+        background: C.bg, borderBottom: `1px solid ${C.border}`,
+        padding: "8px 16px 6px",
+      }}>
+        <div style={{
+          display: "flex", gap: "6px", overflowX: "auto",
+          paddingBottom: "2px", scrollbarWidth: "none",
+        }}>
+          {visibleFilters.map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              flexShrink: 0, padding: "5px 12px", borderRadius: "20px",
+              border: `1px solid ${filter === f ? C.primary : C.border}`,
+              cursor: "pointer", fontSize: "12px",
+              fontWeight: filter === f ? "700" : "500",
+              background: filter === f ? C.primary : C.card,
+              color: filter === f ? "white" : C.muted,
+              whiteSpace: "nowrap", transition: "all 0.15s",
+            }}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Matches grouped by journée */}
+      <div style={{ padding: "0 16px 16px" }}>
+        {filteredMatches.length === 0 && (
+          <div style={{ textAlign: "center", padding: "3rem", color: C.muted }}>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
+            Aucun match dans ce groupe
+          </div>
+        )}
+        {JOURNEE_ORDER.filter(j => matchesByJournee[j]).map(journee => (
+          <div key={journee}>
+            {/* Journée separator */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: "10px",
+              padding: "16px 0 10px",
+            }}>
+              <div style={{ flex: 1, height: "1px", background: C.border }} />
+              <span style={{
+                fontSize: "11px", fontWeight: "800", color: C.primary,
+                textTransform: "uppercase", letterSpacing: "1px",
+              }}>{journee}</span>
+              <div style={{ flex: 1, height: "1px", background: C.border }} />
+            </div>
+
+      {matchesByJournee[journee].map((match, idx) => {
         const matchId = parseInt(match.id)
         const myBet = bets[`${matchId}-result`]
         const isLive = match.state === "in"
@@ -590,7 +689,7 @@ export default function Matches({ user, balance, onBalanceChange }) {
                 color: isLive ? "white" : isFinished ? C.muted : C.primary,
                 letterSpacing: "0.3px", textTransform: "uppercase",
               }}>
-                {isLive ? `● ${match.displayClock}` : isFinished ? "Terminé" : match.statusDetail}
+                {isLive ? `● ${match.displayClock}` : isFinished ? "Terminé" : formatFrenchDate(match.date)}
               </span>
               {match.venue && (
                 <div style={{ textAlign: "right", marginLeft: "8px" }}>
@@ -792,6 +891,9 @@ export default function Matches({ user, balance, onBalanceChange }) {
           </div>
         )
       })}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
