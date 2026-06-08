@@ -185,7 +185,7 @@ export default function App() {
               background: "rgba(255,255,255,0.18)", borderRadius: "8px",
               padding: "2px 8px",
             }}>
-              💰 {credits.toLocaleString("fr-FR")} crédits
+              💰 {(credits ?? 0).toLocaleString("fr-FR")} crédits
             </span>
             <span style={{
               fontSize: "11px", fontWeight: "700", color: "white",
@@ -200,7 +200,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  user={user} credits={credits} onBalanceChange={onBalanceChange} onBetPlaced={refreshProfile} />}
+        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
