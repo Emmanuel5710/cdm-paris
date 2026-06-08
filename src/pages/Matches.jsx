@@ -17,19 +17,31 @@ const ADVANCED_TYPES = ["exact_goals", "exact_corners", "red_card_team", "yellow
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
+// Mapping statique tiré du tirage officiel (ESPN scoreboard n'expose pas le groupe)
+const TEAM_GROUP = {
+  "Mexico": "A",        "South Africa": "A",        "South Korea": "A",          "Czechia": "A",
+  "Canada": "B",        "Bosnia-Herzegovina": "B",  "Qatar": "B",                "Switzerland": "B",
+  "Brazil": "C",        "Morocco": "C",             "Haiti": "C",                "Scotland": "C",
+  "United States": "D", "Paraguay": "D",            "Australia": "D",            "Türkiye": "D",
+  "Germany": "E",       "Curaçao": "E",             "Ivory Coast": "E",          "Ecuador": "E",
+  "Netherlands": "F",   "Japan": "F",               "Sweden": "F",               "Tunisia": "F",
+  "Belgium": "G",       "Egypt": "G",               "Iran": "G",                 "New Zealand": "G",
+  "Spain": "H",         "Cape Verde": "H",          "Saudi Arabia": "H",         "Uruguay": "H",
+  "France": "I",        "Senegal": "I",             "Iraq": "I",                 "Norway": "I",
+  "Argentina": "J",     "Algeria": "J",             "Austria": "J",              "Jordan": "J",
+  "Portugal": "K",      "Congo DR": "K",            "Uzbekistan": "K",           "Colombia": "K",
+  "England": "L",       "Croatia": "L",             "Ghana": "L",                "Panama": "L",
+  // Variantes ESPN possibles
+  "USA": "D",           "Turkey": "D",              "Czech Republic": "A",       "Curacao": "E",
+  "Côte d'Ivoire": "E", "Cote d'Ivoire": "E",       "Bosnia and Herzegovina": "B","DR Congo": "K",
+}
+
 function getGroup(ev) {
-  const groups = ev.competitions?.[0]?.groups
-  if (groups?.length) {
-    const g = groups[0].shortName ?? groups[0].name ?? ""
-    const m = g.match(/([A-L])/i)
-    if (m) return `Groupe ${m[1].toUpperCase()}`
-  }
-  const seasonType = ev.season?.type?.name ?? ""
-  if (/round|semi|final|quarter|knockout|playoff/i.test(seasonType)) return "Phase finale"
-  const notes = ev.competitions?.[0]?.notes?.[0]?.headline ?? ""
-  const mn = notes.match(/Group\s+([A-L])/i)
-  if (mn) return `Groupe ${mn[1].toUpperCase()}`
-  return "Phase finale"
+  const comp = ev.competitions?.[0]
+  const home = comp?.competitors?.find(c => c.homeAway === "home")
+  const away = comp?.competitors?.find(c => c.homeAway === "away")
+  const letter = TEAM_GROUP[home?.team?.displayName] ?? TEAM_GROUP[away?.team?.displayName]
+  return letter ? `Groupe ${letter}` : "Phase finale"
 }
 
 function getJournee(isoDate) {
@@ -42,13 +54,15 @@ function getJournee(isoDate) {
 }
 
 function getFinaleRound(ev) {
-  const stn = ev.season?.type?.name ?? ""
-  if (/round of 32/i.test(stn))  return "Round of 32"
-  if (/round of 16/i.test(stn))  return "Round of 16"
-  if (/quarter/i.test(stn))       return "Quarts de finale"
-  if (/semi/i.test(stn))          return "Demi-finales"
-  if (/3rd|third/i.test(stn))     return "3ème place"
-  if (/final/i.test(stn))         return "Finale"
+  // ESPN: ev.season.slug contient le nom du tour en phase finale
+  const slug = ev.season?.slug ?? ""
+  if (/round.of.32|r32/i.test(slug))  return "Round of 32"
+  if (/round.of.16|r16/i.test(slug))  return "Round of 16"
+  if (/quarter/i.test(slug))           return "Quarts de finale"
+  if (/semi/i.test(slug))              return "Demi-finales"
+  if (/third|3rd/i.test(slug))         return "3ème place"
+  if (/final/i.test(slug))             return "Finale"
+  // Repli par date
   const d = new Date(ev.date)
   if (d < new Date("2026-07-01T00:00:00Z")) return "Round of 32"
   if (d < new Date("2026-07-06T00:00:00Z")) return "Round of 16"
@@ -89,7 +103,10 @@ function parseMatches(data) {
       home: { name: home?.team?.displayName ?? "", logo: home?.team?.logo ?? "", score: home?.score ?? "0", form: home?.form ?? "" },
       away: { name: away?.team?.displayName ?? "", logo: away?.team?.logo ?? "", score: away?.score ?? "0", form: away?.form ?? "" },
     }
-  })
+  }).filter(m =>
+    m.journee !== "finale" ||
+    !/(winner|runner.?up|tbd)/i.test(`${m.home.name} ${m.away.name}`)
+  )
 }
 
 function FormDots({ form }) {
