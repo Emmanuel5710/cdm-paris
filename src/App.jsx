@@ -47,37 +47,25 @@ export default function App() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!user?.id) return
-    supabase.from('bets').select('match_id, bet_type, bet_value, stake, odds')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
-        if (!data) return
-        const map = {}
-        data.forEach(b => { map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value })
-        setAllBets(map)
-      })
-  }, [user])
   const fetchActiveBettors = useCallback(async () => {
     const { data } = await supabase.rpc("count_active_bettors")
     if (data != null) setActiveBettors(data)
   }, [])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
       if (u) {
         fetchActiveBettors()
-        // Charger les paris immédiatement
-        supabase.from('bets').select('match_id, bet_type, bet_value, stake, odds')
+        const { data } = await supabase.from('bets')
+          .select('match_id, bet_type, bet_value, stake, odds')
           .eq('user_id', u.id)
-          .then(({ data }) => {
-            if (!data) return
-            const map = {}
-            data.forEach(b => { map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value })
-            setAllBets(map)
-          })
+        if (data) {
+          const map = {}
+          data.forEach(b => { map[`${parseInt(b.match_id)}-${b.bet_type}`] = b.bet_value })
+          setAllBets(map)
+        }
       }
       setAuthLoading(false)
     })
