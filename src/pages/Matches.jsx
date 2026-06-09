@@ -460,15 +460,13 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function Matches(props) {
-  const { user, credits, onBalanceChange, onBetPlaced } = props
-  const [bets, setBets] = [props.allBets ?? {}, props.setAllBets]
-
+export default function Matches({ user, credits, onBalanceChange, onBetPlaced }) {
+  const [bets, setBets] = useState({})
   const [matches, setMatches] = useState([])
   const [draftStakes, setDraftStakes] = useState({})
-  const [savedStakes, setSavedStakes] = useState(props.allStakes ?? {})
-  const [savedOdds, setSavedOdds] = useState(props.allOdds ?? {})    // { matchId: odds at time of bet }
-  const [oddsMap, setOddsMap] = useState({})         // { matchId: { home, draw, away } } — live
+  const [savedStakes, setSavedStakes] = useState({})
+  const [savedOdds, setSavedOdds] = useState({})
+  const [oddsMap, setOddsMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
@@ -481,14 +479,14 @@ export default function Matches(props) {
   })
   const intervalRef = useRef(null)
 
-  // Source de vérité : charge les paris directement depuis Supabase dès que user est dispo
+  // Charge les paris depuis Supabase dès que user est disponible
   useEffect(() => {
     if (!user?.id) return
     supabase.from('bets')
       .select('match_id, bet_type, bet_value, stake, odds')
       .eq('user_id', user.id)
       .then(({ data }) => {
-        if (!data || data.length === 0) return
+        if (!data) return
         const betsMap = {}, stakesMap = {}, oddsMap = {}
         data.forEach(b => {
           const mid = parseInt(b.match_id)

@@ -25,9 +25,6 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [page, setPage] = useState("matches")
-  const [allBets, setAllBets] = useState({})
-  const [allStakes, setAllStakes] = useState({})
-  const [allOdds, setAllOdds] = useState({})
   const [credits, setCredits] = useState(0)
   const [xp, setXp] = useState(0)
   const [activeBettors, setActiveBettors] = useState(null)
@@ -55,29 +52,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) {
-        fetchActiveBettors()
-        const { data } = await supabase.from('bets')
-          .select('match_id, bet_type, bet_value, stake, odds')
-          .eq('user_id', u.id)
-        if (data) {
-          const betsMap = {}, stakesMap = {}, oddsMap = {}
-          data.forEach(b => {
-            const mid = parseInt(b.match_id)
-            betsMap[`${mid}-${b.bet_type}`] = b.bet_value
-            if (b.bet_type === 'result') {
-              if (b.stake != null) stakesMap[mid] = b.stake
-              if (b.odds != null) oddsMap[mid] = Number(b.odds)
-            }
-          })
-          setAllBets(betsMap)
-          setAllStakes(stakesMap)
-          setAllOdds(oddsMap)
-        }
-      }
+      if (u) fetchActiveBettors()
       setAuthLoading(false)
     })
     supabase.auth.onAuthStateChange((_e, session) => {
@@ -230,7 +208,7 @@ export default function App() {
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
-        {page === "matches"  && <Matches  key={user?.id} user={user} credits={credits} allBets={allBets} setAllBets={setAllBets} allStakes={allStakes} allOdds={allOdds} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
+        {page === "matches"  && <Matches  user={user} credits={credits} onBalanceChange={refreshProfile} onBetPlaced={refreshProfile} />}
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
