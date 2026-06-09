@@ -132,7 +132,12 @@ export default function App() {
 
   if (authLoading) return (
     <div style={{ background: C.bg, minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <span style={{ fontSize: "32px" }}>⚽</span>
+      <svg width="40" height="40" viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="18" fill="#1D9E75"/>
+        <text x="14" y="24" fontSize="20" fontWeight="900" fill="white" fontFamily="Inter,sans-serif">K</text>
+        <circle cx="28" cy="28" r="7" fill="#0F1923" stroke="#1D9E75" strokeWidth="1.5"/>
+        <text x="25" y="32" fontSize="8" fill="white">⚽</text>
+      </svg>
     </div>
   )
 
@@ -149,7 +154,12 @@ export default function App() {
       }}>
         {/* Left: logo + title + username + bettors */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "22px" }}>⚽</span>
+          <svg width="36" height="36" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="18" fill="#1D9E75"/>
+            <text x="14" y="24" fontSize="20" fontWeight="900" fill="white" fontFamily="Inter,sans-serif">K</text>
+            <circle cx="28" cy="28" r="7" fill="#0F1923" stroke="#1D9E75" strokeWidth="1.5"/>
+            <text x="25" y="32" fontSize="8" fill="white">⚽</text>
+          </svg>
           <div>
             <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>
               Kick off
@@ -284,9 +294,16 @@ export default function App() {
           <div style={{
             width: "72px", height: "72px", borderRadius: "20px", margin: "0 auto 16px",
             background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`,
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px",
+            display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 8px 32px rgba(29,158,117,0.4)",
-          }}>⚽</div>
+          }}>
+            <svg width="48" height="48" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="18" fill="#1D9E75"/>
+              <text x="14" y="24" fontSize="20" fontWeight="900" fill="white" fontFamily="Inter,sans-serif">K</text>
+              <circle cx="28" cy="28" r="7" fill="#0F1923" stroke="#1D9E75" strokeWidth="1.5"/>
+              <text x="25" y="32" fontSize="8" fill="white">⚽</text>
+            </svg>
+          </div>
           <h1 style={{ fontSize: "24px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px" }}>Kick off</h1>
           <p style={{ fontSize: "14px", color: C.muted, marginTop: "6px" }}>Pronostics football</p>
         </div>
