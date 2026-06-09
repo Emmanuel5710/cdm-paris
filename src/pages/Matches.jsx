@@ -466,8 +466,8 @@ export default function Matches(props) {
 
   const [matches, setMatches] = useState([])
   const [draftStakes, setDraftStakes] = useState({})
-  const [savedStakes, setSavedStakes] = useState({})
-  const [savedOdds, setSavedOdds] = useState({})    // { matchId: odds at time of bet }
+  const [savedStakes, setSavedStakes] = useState(props.allStakes ?? {})
+  const [savedOdds, setSavedOdds] = useState(props.allOdds ?? {})    // { matchId: odds at time of bet }
   const [oddsMap, setOddsMap] = useState({})         // { matchId: { home, draw, away } } — live
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -480,6 +480,10 @@ export default function Matches(props) {
     return new Set(["finale"])
   })
   const intervalRef = useRef(null)
+
+  // Sync savedStakes/savedOdds from App when they arrive (populated after getSession)
+  useEffect(() => { if (props.allStakes) setSavedStakes(props.allStakes) }, [props.allStakes])
+  useEffect(() => { if (props.allOdds) setSavedOdds(props.allOdds) }, [props.allOdds])
 
   // Local credits mirrors the App prop but updates optimistically on bet placement
   const [localCredits, setLocalCredits] = useState(credits ?? 500)
