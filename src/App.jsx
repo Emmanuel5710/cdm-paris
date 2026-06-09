@@ -227,10 +227,10 @@ export default function App() {
         {page === "mybets"   && <MyBets   user={user} />}
       </div>
 
-      {/* Bottom nav */}
+      {/* Bottom nav — style Parions Sport */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 20,
-        background: C.card, borderTop: `1px solid ${C.border}`,
+        background: "#0D1924", borderTop: "1px solid #1a2a3a",
         display: "flex", height: "64px",
         paddingBottom: "env(safe-area-inset-bottom)",
       }}>
@@ -241,18 +241,32 @@ export default function App() {
           { id: "mybets",   icon: "🎟️", label: "Mes Paris"  },
           { id: "league",   icon: "👥", label: "Ma Ligue"   },
           { id: "shop",     icon: "🎁", label: "Boutique"   },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setPage(tab.id)} style={{
-            flex: 1, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", gap: "3px",
-            border: "none", background: "none", cursor: "pointer",
-            color: page === tab.id ? C.primary : C.dim,
-            transition: "color 0.2s",
-          }}>
-            <span style={{ fontSize: "18px" }}>{tab.icon}</span>
-            <span style={{ fontSize: "10px", fontWeight: page === tab.id ? "700" : "400" }}>{tab.label}</span>
-          </button>
-        ))}
+        ].map(tab => {
+          const active = page === tab.id
+          return (
+            <button key={tab.id} onClick={() => setPage(tab.id)} style={{
+              flex: 1, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: "2px",
+              border: "none", background: "none", cursor: "pointer",
+              color: active ? "#FF6400" : "#5a7a8a",
+              transition: "color 0.15s",
+              position: "relative",
+            }}>
+              {active && (
+                <div style={{
+                  position: "absolute", top: 0, left: "20%", right: "20%",
+                  height: "2px", background: "#FF6400", borderRadius: "0 0 3px 3px",
+                }} />
+              )}
+              <span style={{ fontSize: "20px", filter: active ? "drop-shadow(0 0 4px rgba(255,100,0,0.5))" : "none" }}>
+                {tab.icon}
+              </span>
+              <span style={{ fontSize: "10px", fontWeight: active ? "700" : "500", letterSpacing: "0.2px" }}>
+                {tab.label}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
