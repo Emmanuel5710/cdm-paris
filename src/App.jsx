@@ -235,12 +235,12 @@ export default function App() {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}>
         {[
-          { id: "matches",  icon: "⚽", label: "Matchs"     },
-          { id: "combined", icon: "🎯", label: "Combiné"    },
+          { id: "matches",  icon: "🏠", label: "Matchs"     },
+          { id: "combined", icon: "⚡", label: "Combiné"    },
           { id: "ranking",  icon: "🏆", label: "Classement" },
-          { id: "mybets",   icon: "🎰", label: "Mes Paris"  },
-          { id: "league",   icon: "🤝", label: "Ma Ligue"   },
-          { id: "shop",     icon: "🛍️", label: "Boutique"   },
+          { id: "mybets",   icon: "🎫", label: "Mes Paris"  },
+          { id: "league",   icon: "🛡️", label: "Ma Ligue"   },
+          { id: "shop",     icon: "💳", label: "Boutique"   },
         ].map(tab => (
           <button key={tab.id} onClick={() => setPage(tab.id)} style={{
             flex: 1, display: "flex", flexDirection: "column",
