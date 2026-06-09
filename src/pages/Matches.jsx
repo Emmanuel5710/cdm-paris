@@ -460,12 +460,23 @@ function LockedAdvancedSummary({ bets, matchId, homeName, awayName }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// ── Cache localStorage ────────────────────────────────────────────────────────
+function cacheKey(uid) { return `bets_cache_${uid}` }
+function readCache(uid) {
+  try { return JSON.parse(localStorage.getItem(cacheKey(uid)) || "null") } catch { return null }
+}
+function writeCache(uid, bets, stakes, odds) {
+  try { localStorage.setItem(cacheKey(uid), JSON.stringify({ bets, stakes, odds })) } catch {}
+}
+
 export default function Matches({ user, credits, onBalanceChange, onBetPlaced }) {
-  const [bets, setBets] = useState({})
+  // Initialise immédiatement depuis le cache localStorage
+  const cached = user?.id ? readCache(user.id) : null
+  const [bets, setBets] = useState(cached?.bets ?? {})
   const [matches, setMatches] = useState([])
   const [draftStakes, setDraftStakes] = useState({})
-  const [savedStakes, setSavedStakes] = useState({})
-  const [savedOdds, setSavedOdds] = useState({})
+  const [savedStakes, setSavedStakes] = useState(cached?.stakes ?? {})
+  const [savedOdds, setSavedOdds] = useState(cached?.odds ?? {})
   const [oddsMap, setOddsMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -479,14 +490,14 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   })
   const intervalRef = useRef(null)
 
-  // Charge les paris depuis Supabase dès que user est disponible
+  // Sync depuis Supabase au montage — met à jour le cache si plus récent
   useEffect(() => {
     if (!user?.id) return
     supabase.from('bets')
       .select('match_id, bet_type, bet_value, stake, odds')
       .eq('user_id', user.id)
       .then(({ data }) => {
-        if (!data) return
+        if (!data || data.length === 0) return
         const betsMap = {}, stakesMap = {}, oddsMap = {}
         data.forEach(b => {
           const mid = parseInt(b.match_id)
@@ -499,6 +510,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         setBets(betsMap)
         setSavedStakes(stakesMap)
         setSavedOdds(oddsMap)
+        writeCache(user.id, betsMap, stakesMap, oddsMap)
       })
   }, [user?.id])
 
@@ -570,16 +582,24 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         ...(betType === "result" ? { stake, odds: liveOdds } : {}),
       })
       if (betType === "result" && stake > 0) {
-        setLocalCredits(prev => prev - stake)          // optimistic — instant UI
+        setLocalCredits(prev => prev - stake)
         await supabase.rpc("adjust_credits", { uid: user.id, delta: -stake })
-        setSavedStakes(prev => ({ ...prev, [id]: stake }))
-        setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
+        const newStakes = { ...savedStakes, [id]: stake }
+        const newOdds = { ...savedOdds, [id]: liveOdds }
+        setSavedStakes(newStakes)
+        setSavedOdds(newOdds)
         onBalanceChange?.()
         onBetPlaced?.()
       }
     }
 
-    setBets(prev => ({ ...prev, [`${id}-${betType}`]: betValue }))
+    setBets(prev => {
+      const next = { ...prev, [`${id}-${betType}`]: betValue }
+      const newStakes = betType === "result" ? { ...savedStakes, [id]: stake } : savedStakes
+      const newOdds = betType === "result" ? { ...savedOdds, [id]: liveOdds } : savedOdds
+      writeCache(user.id, next, newStakes, newOdds)
+      return next
+    })
   }
 
   async function cancelBet(matchId, betType) {
@@ -589,7 +609,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     if (betType === "result") {
       const stake = savedStakes[id] ?? 0
       if (stake > 0) {
-        setLocalCredits(prev => prev + stake)          // optimistic — instant UI
+        setLocalCredits(prev => prev + stake)
         await supabase.rpc("adjust_credits", { uid: user.id, delta: stake })
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
         setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
@@ -597,7 +617,12 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         onBetPlaced?.()
       }
     }
-    setBets(prev => { const next = { ...prev }; delete next[`${id}-${betType}`]; return next })
+    setBets(prev => {
+      const next = { ...prev }
+      delete next[`${id}-${betType}`]
+      writeCache(user.id, next, savedStakes, savedOdds)
+      return next
+    })
   }
 
   function toggleAdvanced(matchId) {
