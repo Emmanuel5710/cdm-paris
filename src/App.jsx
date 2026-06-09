@@ -152,7 +152,7 @@ export default function App() {
           <span style={{ fontSize: "22px" }}>⚽</span>
           <div>
             <div style={{ fontWeight: "800", fontSize: "15px", color: "white", letterSpacing: "-0.3px" }}>
-              Kickoff
+              Kick off
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px", flexWrap: "wrap" }}>
               {username && (
@@ -287,7 +287,7 @@ export default function App() {
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: "36px",
             boxShadow: "0 8px 32px rgba(29,158,117,0.4)",
           }}>⚽</div>
-          <h1 style={{ fontSize: "24px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px" }}>Kickoff</h1>
+          <h1 style={{ fontSize: "24px", fontWeight: "800", color: C.text, letterSpacing: "-0.5px" }}>Kick off</h1>
           <p style={{ fontSize: "14px", color: C.muted, marginTop: "6px" }}>Pronostics football</p>
         </div>
 

@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-icon.svg'],
       manifest: {
-        name: 'Kickoff',
-        short_name: 'Kickoff',
+        name: 'Kick off',
+        short_name: 'Kick off',
         description: 'Pronostics football',
         theme_color: '#1D9E75',
         background_color: '#ffffff',

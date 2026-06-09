@@ -118,9 +118,9 @@ export default function League({ user }) {
   }
 
   async function shareLeague() {
-    const text = `Rejoins ma ligue Kickoff ! Code : ${league.invite_code}`
+    const text = `Rejoins ma ligue Kick off ! Code : ${league.invite_code}`
     if (navigator.share) {
-      await navigator.share({ title: "Kickoff", text })
+      await navigator.share({ title: "Kick off", text })
     } else {
       await navigator.clipboard.writeText(text)
       setCopied(true)
