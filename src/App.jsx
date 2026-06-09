@@ -6,6 +6,7 @@ import League from "./pages/League"
 import Combined from "./pages/Combined"
 import Shop from "./pages/Shop"
 import MyBets from "./pages/MyBets"
+import Profile from "./pages/Profile"
 import { importMatches } from "./importMatches"
 
 const C = {
@@ -35,6 +36,7 @@ export default function App() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showProfile, setShowProfile] = useState(false)
 
   const fetchProfile = useCallback(async (uid) => {
     const { data } = await supabase
@@ -171,40 +173,49 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right: credits + xp + actions */}
+        {/* Right: crédits + XP + profil */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px" }}>
-          <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-            {user.email === "emmanuelfayard57@gmail.com" && (
-              <button onClick={handleCalculatePoints} style={{
-                padding: "5px 10px", borderRadius: "20px", cursor: "pointer",
-                fontSize: "11px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
-                background: "rgba(255,255,255,0.15)", color: "white",
-              }}>⚙️ Pts</button>
-            )}
-            <button onClick={() => supabase.auth.signOut()} style={{
-              padding: "5px 12px", borderRadius: "20px", cursor: "pointer",
-              fontSize: "12px", fontWeight: "500", border: "1px solid rgba(255,255,255,0.3)",
-              background: "rgba(255,255,255,0.1)", color: "white",
-            }}>Quitter</button>
-          </div>
-          <div style={{ display: "flex", gap: "4px" }}>
+          {user.email === "emmanuelfayard57@gmail.com" && (
+            <button onClick={handleCalculatePoints} style={{
+              padding: "3px 8px", borderRadius: "20px", cursor: "pointer",
+              fontSize: "10px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
+              background: "rgba(255,255,255,0.15)", color: "white",
+            }}>⚙️ Pts</button>
+          )}
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
             <span style={{
               fontSize: "11px", fontWeight: "700", color: "white",
               background: "rgba(255,255,255,0.18)", borderRadius: "8px",
               padding: "2px 8px",
             }}>
-              💰 {(credits ?? 0).toLocaleString("fr-FR")} crédits
+              💰 {(credits ?? 0).toLocaleString("fr-FR")}
             </span>
             <span style={{
               fontSize: "11px", fontWeight: "700", color: "white",
               background: "rgba(255,255,255,0.13)", borderRadius: "8px",
               padding: "2px 8px",
             }}>
-              ⭐ {xp.toLocaleString("fr-FR")} XP
+              ⭐ {xp.toLocaleString("fr-FR")}
             </span>
+            <button onClick={() => setShowProfile(true)} style={{
+              width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer",
+              border: "2px solid rgba(255,255,255,0.4)",
+              background: "rgba(255,255,255,0.15)", color: "white",
+              fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}>👤</button>
           </div>
         </div>
       </div>
+
+      {/* Profile panel */}
+      {showProfile && (
+        <Profile
+          user={user} username={username}
+          credits={credits} xp={xp}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
 
       {/* Content */}
       <div style={{ flex: 1, paddingBottom: "80px", overflowY: "auto" }}>
