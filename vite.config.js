@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['pwa-icon.svg'],
       manifest: {
-        name: 'CdM Paris 2026',
-        short_name: 'CdM Paris',
-        description: 'Pronostics Coupe du Monde 2026',
+        name: 'Kickoff',
+        short_name: 'Kickoff',
+        description: 'Pronostics football',
         theme_color: '#1D9E75',
         background_color: '#ffffff',
         display: 'standalone',

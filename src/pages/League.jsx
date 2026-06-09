@@ -118,9 +118,9 @@ export default function League({ user }) {
   }
 
   async function shareLeague() {
-    const text = `Rejoins ma ligue CdM Paris 2026 ! Code : ${league.invite_code}`
+    const text = `Rejoins ma ligue Kickoff ! Code : ${league.invite_code}`
     if (navigator.share) {
-      await navigator.share({ title: "CdM Paris 2026", text })
+      await navigator.share({ title: "Kickoff", text })
     } else {
       await navigator.clipboard.writeText(text)
       setCopied(true)
