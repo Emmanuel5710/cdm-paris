@@ -481,9 +481,28 @@ export default function Matches(props) {
   })
   const intervalRef = useRef(null)
 
-  // Sync savedStakes/savedOdds from App when they arrive (populated after getSession)
-  useEffect(() => { if (props.allStakes) setSavedStakes(props.allStakes) }, [props.allStakes])
-  useEffect(() => { if (props.allOdds) setSavedOdds(props.allOdds) }, [props.allOdds])
+  // Source de vérité : charge les paris directement depuis Supabase dès que user est dispo
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('bets')
+      .select('match_id, bet_type, bet_value, stake, odds')
+      .eq('user_id', user.id)
+      .then(({ data }) => {
+        if (!data || data.length === 0) return
+        const betsMap = {}, stakesMap = {}, oddsMap = {}
+        data.forEach(b => {
+          const mid = parseInt(b.match_id)
+          betsMap[`${mid}-${b.bet_type}`] = b.bet_value
+          if (b.bet_type === 'result') {
+            if (b.stake != null) stakesMap[mid] = b.stake
+            if (b.odds != null) oddsMap[mid] = Number(b.odds)
+          }
+        })
+        setBets(betsMap)
+        setSavedStakes(stakesMap)
+        setSavedOdds(oddsMap)
+      })
+  }, [user?.id])
 
   // Local credits mirrors the App prop but updates optimistically on bet placement
   const [localCredits, setLocalCredits] = useState(credits ?? 500)
