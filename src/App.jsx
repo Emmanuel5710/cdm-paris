@@ -27,6 +27,7 @@ export default function App() {
   const [page, setPage] = useState("matches")
   const [credits, setCredits] = useState(0)
   const [xp, setXp] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [activeBettors, setActiveBettors] = useState(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -39,11 +40,12 @@ export default function App() {
 
   const fetchProfile = useCallback(async (uid) => {
     const { data } = await supabase
-      .from("profiles").select("credits, xp, username").eq("id", uid).single()
+      .from("profiles").select("credits, xp, username, is_admin").eq("id", uid).single()
     if (data) {
       setCredits(data.credits ?? 500)
       setXp(data.xp ?? 0)
       setUsername(data.username ?? "")
+      setIsAdmin(data.is_admin ?? false)
     }
   }, [])
 
@@ -71,8 +73,8 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     // Charger le profil initial
-    supabase.from("profiles").select("credits, xp, username").eq("id", user.id).single()
-      .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp); setUsername(data.username ?? "") } })
+    supabase.from("profiles").select("credits, xp, username, is_admin").eq("id", user.id).single()
+      .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp); setUsername(data.username ?? ""); setIsAdmin(data.is_admin ?? false) } })
     // Écouter les changements en temps réel
     const channel = supabase.channel("profile-" + user.id)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + user.id },
@@ -174,7 +176,7 @@ export default function App() {
 
         {/* Right: crédits + XP + profil */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px" }}>
-          {user.email === "emmanuelfayard57@gmail.com" && (
+          {isAdmin && (
             <button onClick={handleCalculatePoints} style={{
               padding: "3px 8px", borderRadius: "20px", cursor: "pointer",
               fontSize: "10px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",

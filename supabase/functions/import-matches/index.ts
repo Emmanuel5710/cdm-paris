@@ -10,6 +10,32 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders })
   }
 
+  // ── Auth guard : JWT requis + is_admin = true ──────────────────
+  const authHeader = req.headers.get("Authorization")
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
+  }
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
+  )
+  const { data: { user }, error: authErr } = await userClient.auth.getUser()
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
+  }
+  const { data: profile } = await userClient.from("profiles").select("is_admin").eq("id", user.id).single()
+  if (!profile?.is_admin) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    })
+  }
+  // ── /Auth guard ────────────────────────────────────────────────
+
   try {
     const response = await fetch("https://worldcup26.ir/get/games")
     const data = await response.json()
@@ -30,12 +56,12 @@ Deno.serve(async (req) => {
       }
     })
 
-    const supabase = createClient(
+    const adminClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     )
 
-    const { error } = await supabase.from("matches").upsert(matches)
+    const { error } = await adminClient.from("matches").upsert(matches)
     if (error) throw error
 
     return new Response(

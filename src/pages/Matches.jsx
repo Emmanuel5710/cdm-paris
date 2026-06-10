@@ -577,19 +577,21 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       await supabase.from("bets").update({ bet_value: betValue, odds: liveOdds }).eq("id", existing.id)
       if (betType === "result") setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
     } else {
-      await supabase.from("bets").insert({
-        user_id: user.id, match_id: id, bet_type: betType, bet_value: betValue,
-        ...(betType === "result" ? { stake, odds: liveOdds } : {}),
-      })
       if (betType === "result" && stake > 0) {
+        const { error: rpcErr } = await supabase.rpc("place_bet", {
+          p_match_id: id, p_bet_type: betType, p_bet_value: betValue,
+          p_stake: stake, p_odds: liveOdds,
+        })
+        if (rpcErr) { console.error("place_bet:", rpcErr.message); return }
         setLocalCredits(prev => prev - stake)
-        await supabase.rpc("adjust_credits", { uid: user.id, delta: -stake })
-        const newStakes = { ...savedStakes, [id]: stake }
-        const newOdds = { ...savedOdds, [id]: liveOdds }
-        setSavedStakes(newStakes)
-        setSavedOdds(newOdds)
+        setSavedStakes(prev => ({ ...prev, [id]: stake }))
+        setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
         onBalanceChange?.()
         onBetPlaced?.()
+      } else {
+        await supabase.from("bets").insert({
+          user_id: user.id, match_id: id, bet_type: betType, bet_value: betValue,
+        })
       }
     }
 
@@ -605,17 +607,19 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   async function cancelBet(matchId, betType) {
     if (!user) return
     const id = parseInt(matchId)
-    await supabase.from("bets").delete().eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType)
     if (betType === "result") {
+      const { error: rpcErr } = await supabase.rpc("cancel_bet", { p_match_id: id, p_bet_type: betType })
+      if (rpcErr) { console.error("cancel_bet:", rpcErr.message); return }
       const stake = savedStakes[id] ?? 0
       if (stake > 0) {
         setLocalCredits(prev => prev + stake)
-        await supabase.rpc("adjust_credits", { uid: user.id, delta: stake })
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
         setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
         onBalanceChange?.()
         onBetPlaced?.()
       }
+    } else {
+      await supabase.from("bets").delete().eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType)
     }
     setBets(prev => {
       const next = { ...prev }

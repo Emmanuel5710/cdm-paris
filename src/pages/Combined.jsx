@@ -257,14 +257,16 @@ export default function Combined({ user, credits, onBalanceChange }) {
       if (selected.has(id)) predsToSave[id] = p
     }
 
-    const { error } = await supabase.from("combined_bets").insert({
-      user_id: user.id, match_ids: matchIds, predictions: predsToSave,
-      matches_info: matchesInfo, multiplier: mult, stake: cappedStake, status: "pending",
+    const { error } = await supabase.rpc("place_combined_bet", {
+      p_match_ids:    matchIds,
+      p_predictions:  predsToSave,
+      p_matches_info: matchesInfo,
+      p_multiplier:   mult,
+      p_stake:        cappedStake,
     })
 
     if (error) { alert("Erreur : " + error.message); setSaving(false); return }
 
-    await supabase.rpc("adjust_credits", { uid: user.id, delta: -cappedStake })
     onBalanceChange?.()
 
     setSelected(new Set()); setPreds({})
