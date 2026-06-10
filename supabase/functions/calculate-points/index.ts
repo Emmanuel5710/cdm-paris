@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
           await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
         }
 
-        await adminClient.from("bets").update({ processed: true }).eq("id", bet.id)
+        await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
         usersUpdated.add(bet.user_id)
       }
       matchesProcessed++
@@ -108,6 +108,19 @@ Deno.serve(async (req) => {
         .eq("id", cb.id)
 
       usersUpdated.add(cb.user_id)
+    }
+
+    // Envoyer les notifications push aux utilisateurs mis à jour
+    const updatedIds = [...usersUpdated]
+    if (updatedIds.length > 0) {
+      await adminClient.functions.invoke("send-notification", {
+        body: {
+          user_ids: updatedIds,
+          title: "Kick off — Résultats",
+          body: "Tes paris ont été traités. Regarde tes résultats !",
+          url: "/",
+        },
+      })
     }
 
     return new Response(

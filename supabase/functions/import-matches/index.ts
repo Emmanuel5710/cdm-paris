@@ -28,12 +28,7 @@ Deno.serve(async (req) => {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   }
-  const { data: profile } = await userClient.from("profiles").select("is_admin").eq("id", user.id).single()
-  if (!profile?.is_admin) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    })
-  }
+  // Tout utilisateur authentifié peut déclencher le sync des matchs
   // ── /Auth guard ────────────────────────────────────────────────
 
   try {

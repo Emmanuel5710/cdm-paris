@@ -692,7 +692,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         const isLocked = isLive || isFinished
         const isAdvancedOpen = expandedAdvanced.has(match.id)
         const stake = getStake(matchId)
-        const canBet = true // credit check temporarily disabled
+        const canBet = safeBalance - stake >= MIN_BALANCE
         const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
         const stakeMax = maxStake
         const matchOdds = oddsMap[matchId] ?? {}

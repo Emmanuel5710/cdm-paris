@@ -7,6 +7,7 @@ import Combined from "./pages/Combined"
 import MyBets from "./pages/MyBets"
 import Profile from "./pages/Profile"
 import { importMatches } from "./importMatches"
+import { usePushNotifications } from "./hooks/usePushNotifications"
 
 const C = {
   bg: "#0F1923", card: "#1A2634", border: "#243447",
@@ -37,6 +38,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [showProfile, setShowProfile] = useState(false)
+  const { status: pushStatus, requestPermission } = usePushNotifications(user)
 
   const fetchProfile = useCallback(async (uid) => {
     const { data } = await supabase
@@ -58,16 +60,15 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) fetchActiveBettors()
+      if (u) { fetchActiveBettors(); importMatches() }
       setAuthLoading(false)
     })
     supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
       setUser(u)
-      if (u) fetchActiveBettors()
+      if (u) { fetchActiveBettors(); importMatches() }
       else { setCredits(0); setXp(0); setUsername(""); setActiveBettors(null) }
     })
-    importMatches()
   }, [fetchActiveBettors])
 
   useEffect(() => {
@@ -182,6 +183,13 @@ export default function App() {
               fontSize: "10px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
               background: "rgba(255,255,255,0.15)", color: "white",
             }}>⚙️ Pts</button>
+          )}
+          {pushStatus === "idle" && (
+            <button onClick={requestPermission} style={{
+              padding: "3px 8px", borderRadius: "20px", cursor: "pointer",
+              fontSize: "10px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
+              background: "rgba(255,255,255,0.15)", color: "white",
+            }}>🔔 Notifs</button>
           )}
           <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
             <span style={{

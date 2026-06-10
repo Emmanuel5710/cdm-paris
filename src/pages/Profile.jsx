@@ -17,25 +17,25 @@ export default function Profile({ user, username, credits, xp, onClose }) {
     async function load() {
       const { data: bets } = await supabase
         .from("bets")
-        .select("bet_type, processed, stake, odds")
+        .select("bet_type, processed, won, stake, odds")
         .eq("user_id", user.id)
 
       if (!bets) { setLoading(false); return }
 
       const total = bets.length
       const result = bets.filter(b => b.bet_type === "result")
-      const won = result.filter(b => b.processed === true).length
-      const lost = result.filter(b => b.processed === false).length
-      const pending = result.filter(b => b.processed === null || b.processed === undefined).length
+      const won = result.filter(b => b.won === true).length
+      const lost = result.filter(b => b.won === false).length
+      const pending = result.filter(b => b.won === null).length
       const advanced = bets.filter(b => b.bet_type !== "result").length
 
       const totalStaked = result.reduce((s, b) => s + (b.stake ?? 0), 0)
       const totalGained = result
-        .filter(b => b.processed === true)
+        .filter(b => b.won === true)
         .reduce((s, b) => s + Math.round((b.stake ?? 0) * Number(b.odds ?? 2)), 0)
 
-      const winRate = result.length > 0
-        ? Math.round((won / (won + lost || 1)) * 100)
+      const winRate = (won + lost) > 0
+        ? Math.round((won / (won + lost)) * 100)
         : null
 
       setStats({ total, won, lost, pending, advanced, totalStaked, totalGained, winRate })

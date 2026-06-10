@@ -68,14 +68,11 @@ export default function League({ user }) {
     const { data: members } = await supabase.from("league_members").select("user_id").eq("league_id", league.id)
     if (!members?.length) { setRanking([]); return }
 
-    const membersWithProfiles = await Promise.all(
-      members.map(async m => {
-        const { data: p } = await supabase.from("profiles").select("username").eq("id", m.user_id).single()
-        return { user_id: m.user_id, username: p?.username || "Inconnu" }
-      })
-    )
-
-    const memberIds = membersWithProfiles.map(m => m.user_id)
+    const memberIds = members.map(m => m.user_id)
+    const { data: profiles } = await supabase
+      .from("profiles").select("id, username").in("id", memberIds)
+    const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p.username ?? "Inconnu"]))
+    const membersWithProfiles = members.map(m => ({ user_id: m.user_id, username: profileMap[m.user_id] ?? "Inconnu" }))
     const [{ data: finishedMatches }, { data: bets }] = await Promise.all([
       supabase.from("matches").select("id, home_score, away_score").eq("status", "finished"),
       supabase.from("bets").select("user_id, match_id, bet_value").in("user_id", memberIds).eq("bet_type", "result"),
