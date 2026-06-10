@@ -495,7 +495,7 @@ export default function Combined({ user, credits, onBalanceChange }) {
           {!canBet ? (
             <div style={{ padding: "10px 12px", borderRadius: "10px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", textAlign: "center" }}>
               <div style={{ fontSize: "13px", color: "#f87171", fontWeight: "600" }}>Vous avez atteint le solde minimum.</div>
-              <div style={{ fontSize: "11px", color: C.dim, marginTop: "4px" }}>Achetez des points en boutique pour continuer.</div>
+              <div style={{ fontSize: "11px", color: C.dim, marginTop: "4px" }}>Solde insuffisant pour continuer.</div>
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>

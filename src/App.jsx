@@ -4,7 +4,6 @@ import Matches from "./pages/Matches"
 import Ranking from "./pages/Ranking"
 import League from "./pages/League"
 import Combined from "./pages/Combined"
-import Shop from "./pages/Shop"
 import MyBets from "./pages/MyBets"
 import Profile from "./pages/Profile"
 import { importMatches } from "./importMatches"
@@ -233,7 +232,6 @@ export default function App() {
         {page === "combined" && <Combined user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "ranking"  && <Ranking  user={user} xp={xp} onNavigate={setPage} />}
         {page === "league"   && <League   user={user} />}
-        {page === "shop"     && <Shop     user={user} credits={credits} onBalanceChange={onBalanceChange} />}
         {page === "mybets"   && <MyBets   user={user} />}
       </div>
 
@@ -250,7 +248,6 @@ export default function App() {
           { id: "ranking",  icon: "📊", label: "Classement" },
           { id: "mybets",   icon: "🎟️", label: "Mes Paris"  },
           { id: "league",   icon: "👥", label: "Ma Ligue"   },
-          { id: "shop",     icon: "🎁", label: "Boutique"   },
         ].map(tab => {
           const active = page === tab.id
           return (

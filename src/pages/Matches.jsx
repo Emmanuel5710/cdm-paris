@@ -841,7 +841,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                       Crédits insuffisants (minimum 50 requis).
                     </div>
                     <div style={{ fontSize: "11px", color: C.dim, marginTop: "4px" }}>
-                      Achetez des crédits en boutique pour continuer à parier.
+                      Crédits insuffisants pour continuer à parier.
                     </div>
                   </div>
                 ) : (
