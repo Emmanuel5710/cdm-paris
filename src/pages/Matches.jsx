@@ -595,7 +595,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     // ── Paris résultat ──────────────────────────────────────────
     if (betType === "result") {
       const stake = getStake(id)
-      const liveOdds = oddsMap[id]?.[betValue] ?? null
+      const liveOdds = oddsMap[id]?.odds?.[betValue] ?? null
 
       const { data: existing } = await supabase
         .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", "result").maybeSingle()
@@ -768,7 +768,10 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         const canBet = safeBalance - stake >= MIN_BALANCE
         const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
         const stakeMax = maxStake
-        const matchOdds = oddsMap[matchId] ?? {}
+        const matchData  = oddsMap[matchId] ?? {}
+        const matchOdds  = matchData.odds  ?? {}
+        const matchPct   = matchData.pct   ?? {}
+        const matchTotal = matchData.total ?? 0
 
         const scorerCount = Object.keys(bets).filter(k => k.startsWith(`${matchId}-scorer_`)).length
         const advancedCount = ADVANCED_TYPES.filter(t => bets[`${matchId}-${t}`] != null).length + scorerCount
@@ -925,16 +928,25 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                 ) : (
                   /* No bet — prediction buttons with live odds + stake */
                   <>
-                    <p style={{ fontSize: "11px", color: C.dim, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>
-                      Pronostic · Cotes en direct
-                    </p>
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <p style={{ fontSize: "11px", color: C.dim, textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600", margin: 0 }}>
+                        Pronostic · Cotes parimutuel
+                      </p>
+                      {matchTotal > 0 && (
+                        <span style={{ fontSize: "10px", color: C.dim }}>
+                          👥 {matchData.counts ? (matchData.counts.home + matchData.counts.draw + matchData.counts.away) : 0} parieur{(matchData.counts?.home + matchData.counts?.draw + matchData.counts?.away) > 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                       {[
                         { label: match.home.name, value: "home" },
                         { label: "Nul",            value: "draw" },
                         { label: match.away.name,  value: "away" },
                       ].map(opt => {
                         const oddsVal = matchOdds[opt.value]
+                        const pct     = matchPct[opt.value] ?? 0
                         const potGain = oddsVal ? Math.round(stake * oddsVal) : null
                         return (
                           <button key={opt.value} onClick={() => save("result", opt.value)} style={{
@@ -966,8 +978,13 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                             }}>
                               {fmtOdds(oddsVal)}
                             </div>
+                            {pct > 0 && (
+                              <div style={{ fontSize: "9px", color: C.muted, marginTop: "2px" }}>
+                                {pct}%
+                              </div>
+                            )}
                             {potGain && (
-                              <div style={{ fontSize: "9px", color: C.primary, marginTop: "2px", fontWeight: "600" }}>
+                              <div style={{ fontSize: "9px", color: C.primary, marginTop: "1px", fontWeight: "600" }}>
                                 → {potGain} pts
                               </div>
                             )}
@@ -975,6 +992,26 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                         )
                       })}
                     </div>
+
+                    {/* Distribution bar */}
+                    {matchTotal > 0 ? (
+                      <div style={{ marginBottom: "10px" }}>
+                        <div style={{ display: "flex", height: "5px", borderRadius: "4px", overflow: "hidden", gap: "1px" }}>
+                          {matchPct.home > 0 && <div style={{ flex: matchPct.home, background: C.primary, borderRadius: "4px 0 0 4px" }} />}
+                          {matchPct.draw > 0 && <div style={{ flex: matchPct.draw, background: "#64748b" }} />}
+                          {matchPct.away > 0 && <div style={{ flex: matchPct.away, background: "#f59e0b", borderRadius: "0 4px 4px 0" }} />}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                          <span style={{ fontSize: "9px", color: C.primary, fontWeight: "600" }}>{matchPct.home || 0}% dom.</span>
+                          <span style={{ fontSize: "9px", color: "#64748b", fontWeight: "600" }}>{matchPct.draw || 0}% nul</span>
+                          <span style={{ fontSize: "9px", color: "#f59e0b", fontWeight: "600" }}>{matchPct.away || 0}% ext.</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ marginBottom: "10px", textAlign: "center" }}>
+                        <span style={{ fontSize: "10px", color: C.dim, fontStyle: "italic" }}>Sois le premier à parier sur ce match !</span>
+                      </div>
+                    )}
 
                     {/* Stake selector */}
                     <div style={{
