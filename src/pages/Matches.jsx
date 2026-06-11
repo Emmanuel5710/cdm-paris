@@ -570,7 +570,10 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
 
   async function fetchAllResultBets() {
     const { data } = await supabase.from("bets").select("match_id, bet_value, stake").eq("bet_type", "result")
-    if (data) setOddsMap(computeOddsMap(data))
+    if (!data) return null
+    const map = computeOddsMap(data)
+    setOddsMap(map)
+    return map
   }
 
   // ── Stake helpers ────────────────────────────────────────────────────────────
@@ -612,9 +615,12 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
           p_stake: stake, p_odds: liveOdds,
         })
         if (rpcErr) { console.error("place_bet result:", rpcErr.message); return }
+        // Refetch odds immédiatement pour inclure le nouveau pari dans le calcul
+        const freshMap = await fetchAllResultBets()
+        const freshOdds = freshMap?.[id]?.odds?.[betValue] ?? liveOdds
         setLocalCredits(prev => prev - stake)
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
-        setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
+        setSavedOdds(prev => ({ ...prev, [id]: freshOdds }))
         onBalanceChange?.(stake)
         onBetPlaced?.()
       }
