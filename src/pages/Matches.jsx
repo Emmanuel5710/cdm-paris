@@ -615,7 +615,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         setLocalCredits(prev => prev - stake)
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
-        onBalanceChange?.()
+        onBalanceChange?.(stake)
         onBetPlaced?.()
       }
       setBets(prev => {
@@ -636,7 +636,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       if (rpcErr) { console.error(`place_bet ${betType}:`, rpcErr.message); return }
       const fixedOdds = FIXED_ODDS[betType][betValue]
       setLocalCredits(prev => prev - stake)
-      onBalanceChange?.()
+      onBalanceChange?.(stake)
       const newAdvSaved = { ...advSavedData, [`${id}-${betType}`]: { stake, odds: fixedOdds } }
       setAdvSavedData(newAdvSaved)
       setBets(prev => {
@@ -674,7 +674,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         setLocalCredits(prev => prev + stake)
         setSavedStakes(prev => { const n = { ...prev }; delete n[id]; return n })
         setSavedOdds(prev => { const n = { ...prev }; delete n[id]; return n })
-        onBalanceChange?.()
+        onBalanceChange?.(-stake)
         onBetPlaced?.()
       }
     } else if (betType === "total_goals" || betType === "btts") {
@@ -683,7 +683,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       const stake = advSavedData[`${id}-${betType}`]?.stake ?? 0
       if (stake > 0) {
         setLocalCredits(prev => prev + stake)
-        onBalanceChange?.()
+        onBalanceChange?.(-stake)
       }
       setAdvSavedData(prev => {
         const n = { ...prev }; delete n[`${id}-${betType}`]
@@ -947,6 +947,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                       ].map(opt => {
                         const oddsVal = matchOdds[opt.value]
                         const pct     = matchPct[opt.value] ?? 0
+                        const count   = matchData.counts?.[opt.value] ?? 0
                         const potGain = oddsVal ? Math.round(stake * oddsVal) : null
                         return (
                           <button key={opt.value} onClick={() => save("result", opt.value)} style={{
@@ -972,14 +973,17 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }} translate="no">{opt.label}</div>
                             <div style={{
-                              fontSize: "16px", fontWeight: "800",
+                              fontSize: "13px", fontWeight: "800",
                               color: oddsVal ? C.odds : C.dim,
                               marginTop: "4px", letterSpacing: "-0.3px",
                             }}>
                               {fmtOdds(oddsVal)}
                             </div>
+                            <div style={{ fontSize: "9px", color: C.dim, marginTop: "3px" }}>
+                              {count > 0 ? `👤 ${count}` : "—"}
+                            </div>
                             {pct > 0 && (
-                              <div style={{ fontSize: "9px", color: C.muted, marginTop: "2px" }}>
+                              <div style={{ fontSize: "9px", color: C.muted, marginTop: "1px" }}>
                                 {pct}%
                               </div>
                             )}

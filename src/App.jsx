@@ -126,7 +126,8 @@ export default function App() {
     }
   }
 
-  function onBalanceChange() {
+  function onBalanceChange(delta) {
+    if (typeof delta === "number") setCredits(c => Math.max(0, (c ?? 0) - delta))
     if (user) fetchProfile()
   }
 
