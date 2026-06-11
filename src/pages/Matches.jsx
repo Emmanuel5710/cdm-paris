@@ -498,6 +498,9 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [betError, setBetError] = useState("")
+  // Mapping ESPN match ID → Supabase DB match ID (deux APIs différentes)
+  const [espnToDb, setEspnToDb] = useState({})
+  const [dbToEspn, setDbToEspn] = useState({})
   const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
   const [expandedJournees, setExpandedJournees] = useState(() => {
     const t = new Date().toISOString().slice(0, 10)
@@ -508,9 +511,42 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   })
   const intervalRef = useRef(null)
 
-  // Sync depuis Supabase au montage — met à jour le cache si plus récent
+  // Normalise un nom d'équipe pour la correspondance ESPN ↔ worldcup26.ir
+  function normTeam(s) {
+    return (s || "").toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/\busa\b/g, "united states")
+      .replace(/\bturkey\b/g, "turkiye")
+      .replace(/\bcuracao\b/g, "curacao")
+      .replace(/[^a-z0-9]+/g, " ").trim()
+  }
+
+  // Charge les matchs Supabase et construit la table de correspondance ESPN ID ↔ DB ID
   useEffect(() => {
-    if (!user?.id) return
+    supabase.from("matches").select("id, home_team, away_team").then(({ data: dbMatches }) => {
+      if (!dbMatches?.length) return
+      const byTeams = {}
+      dbMatches.forEach(m => { byTeams[normTeam(m.home_team) + "|" + normTeam(m.away_team)] = m.id })
+      setEspnToDb(prev => ({ ...prev, _dbMatches: dbMatches, _byTeams: byTeams }))
+    })
+  }, [])
+
+  // Quand les matchs ESPN chargent, construit le mapping ESPN ID → DB ID
+  useEffect(() => {
+    if (!matches.length || !espnToDb._byTeams) return
+    const e2d = {}, d2e = {}
+    matches.forEach(m => {
+      const k = normTeam(m.home.name) + "|" + normTeam(m.away.name)
+      const dbId = espnToDb._byTeams[k]
+      if (dbId) { e2d[parseInt(m.id)] = dbId; d2e[dbId] = parseInt(m.id) }
+    })
+    setEspnToDb(e2d)
+    setDbToEspn(d2e)
+  }, [matches, espnToDb._byTeams])
+
+  // Sync des paris depuis Supabase — utilise dbToEspn pour ramener les IDs ESPN
+  useEffect(() => {
+    if (!user?.id || !Object.keys(dbToEspn).length) return
     supabase.from('bets')
       .select('match_id, bet_type, bet_value, stake, odds')
       .eq('user_id', user.id)
@@ -518,7 +554,8 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         if (!data || data.length === 0) return
         const betsMap = {}, stakesMap = {}, oddsMap = {}, advSavedMap = {}
         data.forEach(b => {
-          const mid = parseInt(b.match_id)
+          const dbId = parseInt(b.match_id)
+          const mid = dbToEspn[dbId] ?? dbId
           betsMap[`${mid}-${b.bet_type}`] = b.bet_value
           if (b.bet_type === "result") {
             if (b.stake != null) stakesMap[mid] = b.stake
@@ -533,7 +570,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         setAdvSavedData(advSavedMap)
         writeCache(user.id, betsMap, stakesMap, oddsMap, advSavedMap)
       })
-  }, [user?.id])
+  }, [user?.id, dbToEspn])
 
   // Local credits mirrors the App prop but updates optimistically on bet placement
   const [localCredits, setLocalCredits] = useState(null)
@@ -592,6 +629,8 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   async function placeBet(matchId, betType, betValue, advStakeArg = null) {
     if (!user) return
     const id = parseInt(matchId)
+    const dbId = espnToDb[id]
+    if (!dbId) { setBetError("Match non encore synchronisé — réessaie dans quelques secondes"); return }
 
     // ── Paris résultat ──────────────────────────────────────────
     if (betType === "result") {
@@ -599,20 +638,20 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       const liveOdds = oddsMap[id]?.[betValue] ?? null
 
       const { data: existing } = await supabase
-        .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", "result").maybeSingle()
+        .from("bets").select("id").eq("user_id", user.id).eq("match_id", dbId).eq("bet_type", "result").maybeSingle()
 
       if (existing) {
         const { error: updErr } = await supabase.rpc("update_bet", {
-          p_match_id: id, p_bet_value: betValue, p_odds: liveOdds,
+          p_match_id: dbId, p_bet_value: betValue, p_odds: liveOdds,
         })
-        if (updErr) { console.error("update_bet:", updErr.message); return }
+        if (updErr) { console.error("update_bet:", updErr.message); setBetError("Erreur : " + updErr.message); return }
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
       } else {
         const { error: rpcErr } = await supabase.rpc("place_bet", {
-          p_match_id: id, p_bet_type: "result", p_bet_value: betValue,
+          p_match_id: dbId, p_bet_type: "result", p_bet_value: betValue,
           p_stake: stake, p_odds: liveOdds,
         })
-        if (rpcErr) { console.error("place_bet result:", rpcErr.message); setBetError("Erreur pari résultat : " + rpcErr.message); return }
+        if (rpcErr) { console.error("place_bet result:", rpcErr.message); setBetError("Erreur : " + rpcErr.message); return }
         setLocalCredits(prev => prev - stake)
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
@@ -631,10 +670,10 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     if (betType === "total_goals" || betType === "btts") {
       const stake = advStakeArg ?? getAdvStake(id, betType)
       const { error: rpcErr } = await supabase.rpc("place_bet", {
-        p_match_id: id, p_bet_type: betType, p_bet_value: betValue,
+        p_match_id: dbId, p_bet_type: betType, p_bet_value: betValue,
         p_stake: stake, p_odds: null,
       })
-      if (rpcErr) { console.error(`place_bet ${betType}:`, rpcErr.message); setBetError("Erreur pari avancé : " + rpcErr.message); return }
+      if (rpcErr) { console.error(`place_bet ${betType}:`, rpcErr.message); setBetError("Erreur : " + rpcErr.message); return }
       const fixedOdds = FIXED_ODDS[betType][betValue]
       setLocalCredits(prev => prev - stake)
       onBalanceChange?.()
@@ -650,11 +689,11 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
 
     // ── Paris libres (scorer_N) : sans mise ─────────────────────
     const { data: existing } = await supabase
-      .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType).maybeSingle()
+      .from("bets").select("id").eq("user_id", user.id).eq("match_id", dbId).eq("bet_type", betType).maybeSingle()
     if (existing) {
       await supabase.from("bets").update({ bet_value: betValue }).eq("id", existing.id)
     } else {
-      await supabase.from("bets").insert({ user_id: user.id, match_id: id, bet_type: betType, bet_value: betValue })
+      await supabase.from("bets").insert({ user_id: user.id, match_id: dbId, bet_type: betType, bet_value: betValue })
     }
     setBets(prev => {
       const next = { ...prev, [`${id}-${betType}`]: betValue }
@@ -666,9 +705,10 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   async function cancelBet(matchId, betType) {
     if (!user) return
     const id = parseInt(matchId)
+    const dbId = espnToDb[id] ?? id
 
     if (betType === "result") {
-      const { error: rpcErr } = await supabase.rpc("cancel_bet", { p_match_id: id, p_bet_type: betType })
+      const { error: rpcErr } = await supabase.rpc("cancel_bet", { p_match_id: dbId, p_bet_type: betType })
       if (rpcErr) { console.error("cancel_bet result:", rpcErr.message); return }
       const stake = savedStakes[id] ?? 0
       if (stake > 0) {
@@ -679,7 +719,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         onBetPlaced?.()
       }
     } else if (betType === "total_goals" || betType === "btts") {
-      const { error: rpcErr } = await supabase.rpc("cancel_bet", { p_match_id: id, p_bet_type: betType })
+      const { error: rpcErr } = await supabase.rpc("cancel_bet", { p_match_id: dbId, p_bet_type: betType })
       if (rpcErr) { console.error(`cancel_bet ${betType}:`, rpcErr.message); return }
       const stake = advSavedData[`${id}-${betType}`]?.stake ?? 0
       if (stake > 0) {
