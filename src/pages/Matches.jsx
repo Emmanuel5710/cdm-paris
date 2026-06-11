@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "../supabase"
-import { computeOddsMap, fmtOdds } from "../utils/odds"
+import { computeOddsMap, fmtOdds, DEFAULT_ODDS } from "../utils/odds"
 
 const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=200&dates=20260611-20260719"
 const C = {
@@ -595,7 +595,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     // ── Paris résultat ──────────────────────────────────────────
     if (betType === "result") {
       const stake = getStake(id)
-      const liveOdds = oddsMap[id]?.odds?.[betValue] ?? null
+      const liveOdds = oddsMap[id]?.odds?.[betValue] ?? DEFAULT_ODDS[betValue]
 
       const { data: existing } = await supabase
         .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", "result").maybeSingle()
@@ -769,7 +769,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         const maxStake = Math.max(10, safeBalance - MIN_BALANCE)
         const stakeMax = maxStake
         const matchData  = oddsMap[matchId] ?? {}
-        const matchOdds  = matchData.odds  ?? {}
+        const matchOdds  = matchData.odds  ?? DEFAULT_ODDS
         const matchPct   = matchData.pct   ?? {}
         const matchTotal = matchData.total ?? 0
 

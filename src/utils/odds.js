@@ -1,4 +1,9 @@
-// Parimutuel odds: cote(outcome) = totalStakeOnMatch / stakeOnOutcome, min 1.10
+// Parimutuel avec pool de départ (seed) de 100 pts par outcome
+// Cote(outcome) = (pool_total + seed*3) / (stake_on_outcome + seed)
+// Sans paris réels → ×3.00 pour chaque outcome
+// Plus un outcome est populaire, plus sa cote baisse
+
+const SEED = 100
 
 export function computeOddsMap(bets) {
   const byMatch = {}
@@ -12,22 +17,23 @@ export function computeOddsMap(bets) {
       byMatch[mid].count[b.bet_value] += 1
     }
   }
+
   const result = {}
   for (const [mid, d] of Object.entries(byMatch)) {
+    const seededTotal = d.total + SEED * 3
     result[mid] = { odds: {}, pct: {}, counts: d.count, total: d.total }
     for (const o of ["home", "draw", "away"]) {
-      if (d[o] > 0 && d.total > 0) {
-        const raw = d.total / d[o]
-        result[mid].odds[o] = Math.max(1.1, Math.round(raw * 100) / 100)
-        result[mid].pct[o] = Math.round((d[o] / d.total) * 100)
-      } else {
-        result[mid].odds[o] = null
-        result[mid].pct[o] = 0
-      }
+      const seededStake = d[o] + SEED
+      const raw = seededTotal / seededStake
+      result[mid].odds[o] = Math.round(raw * 100) / 100
+      result[mid].pct[o] = d.total > 0 ? Math.round((d[o] / d.total) * 100) : 0
     }
   }
   return result
 }
+
+// Cotes par défaut quand aucun pari n'existe encore pour un match
+export const DEFAULT_ODDS = { home: 3.00, draw: 3.00, away: 3.00 }
 
 export function fmtOdds(v) {
   if (v == null) return "—"
