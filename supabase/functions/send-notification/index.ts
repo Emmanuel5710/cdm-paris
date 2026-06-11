@@ -9,51 +9,53 @@ const adminClient = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 )
 
-// ── VAPID signature helpers ────────────────────────────────────────
+// ── VAPID helpers ──────────────────────────────────────────────────
 
 function b64urlDecode(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/").padEnd(s.length + (4 - s.length % 4) % 4, "=")
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/")
+    .padEnd(s.length + (4 - s.length % 4) % 4, "=")
   return Uint8Array.from(atob(b64), c => c.charCodeAt(0))
 }
-function b64urlEncode(buf: ArrayBuffer): string {
+function b64urlEncode(buf: ArrayBuffer | Uint8Array): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
 }
 
-async function buildVapidHeaders(audience: string): Promise<Record<string, string>> {
+async function buildVapidJwt(audience: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  const header = { typ: "JWT", alg: "ES256" }
+  const header  = { typ: "JWT", alg: "ES256" }
   const payload = { aud: audience, exp: now + 43200, sub: VAPID_SUBJECT }
   const enc = (o: object) => b64urlEncode(new TextEncoder().encode(JSON.stringify(o)))
   const sigInput = `${enc(header)}.${enc(payload)}`
 
-  const rawKey = b64urlDecode(VAPID_PRIVATE.replace(/^MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg/, "").slice(0, 44))
+  // VAPID_PRIVATE is the raw base64url-encoded 32-byte EC private key
+  const rawKey = b64urlDecode(VAPID_PRIVATE)
   const key = await crypto.subtle.importKey(
     "raw", rawKey, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]
   )
   const sig = await crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(sigInput)
   )
-  const jwt = `${sigInput}.${b64urlEncode(sig)}`
-
-  return {
-    Authorization: `vapid t=${jwt},k=${VAPID_PUBLIC}`,
-    "Content-Type": "application/json",
-  }
+  return `${sigInput}.${b64urlEncode(sig)}`
 }
 
-// ── Push sender ────────────────────────────────────────────────────
+// ── Push sender — empty push (no encrypted payload required) ──────
 
-async function sendPush(sub: { endpoint: string; p256dh: string; auth_key: string }, payload: string): Promise<boolean> {
-  const url = new URL(sub.endpoint)
+async function sendPush(endpoint: string): Promise<boolean> {
+  const url = new URL(endpoint)
   const audience = `${url.protocol}//${url.host}`
-  const headers = await buildVapidHeaders(audience)
+  const jwt = await buildVapidJwt(audience)
 
-  const res = await fetch(sub.endpoint, {
+  const res = await fetch(endpoint, {
     method: "POST",
-    headers: { ...headers, "TTL": "86400" },
-    body: payload,
+    headers: {
+      Authorization: `vapid t=${jwt},k=${VAPID_PUBLIC}`,
+      TTL: "86400",
+    },
   })
+  if (!res.ok && res.status !== 201) {
+    console.error(`Push failed ${res.status}:`, await res.text().catch(() => ""))
+  }
   return res.ok || res.status === 201
 }
 
@@ -62,44 +64,38 @@ async function sendPush(sub: { endpoint: string; p256dh: string; auth_key: strin
 const INTERNAL_SECRET = Deno.env.get("INTERNAL_NOTIFY_SECRET") ?? ""
 
 Deno.serve(async (req) => {
-  // Only callable server-side (from calculate-points via service role)
   const secret = req.headers.get("x-internal-secret") ?? ""
   if (!INTERNAL_SECRET || secret !== INTERNAL_SECRET) {
     return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 })
   }
 
   try {
-    const { user_ids, title, body, url } = await req.json() as {
-      user_ids: string[]
-      title:    string
-      body:     string
-      url?:     string
-    }
+    const { user_ids } = await req.json() as { user_ids: string[] }
 
-    if (!user_ids?.length || !title || !body) {
-      return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400 })
+    if (!user_ids?.length) {
+      return new Response(JSON.stringify({ error: "Missing user_ids" }), { status: 400 })
     }
 
     const { data: subs } = await adminClient
       .from("push_subscriptions")
-      .select("endpoint, p256dh, auth_key")
+      .select("endpoint, user_id")
       .in("user_id", user_ids)
 
     if (!subs?.length) {
-      return new Response(JSON.stringify({ sent: 0 }), { headers: { "Content-Type": "application/json" } })
+      return new Response(JSON.stringify({ sent: 0 }), {
+        headers: { "Content-Type": "application/json" },
+      })
     }
 
-    const payload = JSON.stringify({ title, body, url: url ?? "/" })
     let sent = 0
     const dead: string[] = []
 
     for (const sub of subs) {
-      const ok = await sendPush(sub, payload)
+      const ok = await sendPush(sub.endpoint)
       if (ok) sent++
       else dead.push(sub.endpoint)
     }
 
-    // Supprimer les subscriptions expirées (410 Gone)
     if (dead.length) {
       await adminClient.from("push_subscriptions").delete().in("endpoint", dead)
     }

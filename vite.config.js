@@ -38,6 +38,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
+        importScripts: ['push-handler.js'],
       },
     }),
   ],

@@ -38,6 +38,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [showProfile, setShowProfile] = useState(false)
+  const [showNotifModal, setShowNotifModal] = useState(false)
   const { status: pushStatus, requestPermission } = usePushNotifications(user)
 
   const fetchProfile = useCallback(async () => {
@@ -82,6 +83,14 @@ export default function App() {
     })
   }, [fetchActiveBettors])
 
+  // Popup notification : une seule fois, 2s après connexion
+  useEffect(() => {
+    if (!user || pushStatus !== "idle") return
+    if (localStorage.getItem("notif_dismissed")) return
+    const t = setTimeout(() => setShowNotifModal(true), 2000)
+    return () => clearTimeout(t)
+  }, [user, pushStatus])
+
   useEffect(() => {
     if (!user) return
     // Charger le profil initial via RPC (credits + is_admin protégés)
@@ -115,6 +124,15 @@ export default function App() {
       if (data.user) await supabase.from("profiles").insert({ id: data.user.id, username, credits: 500, xp: 0 })
     }
     setLoading(false)
+  }
+
+  function handleNotifAllow() {
+    setShowNotifModal(false)
+    requestPermission()
+  }
+  function handleNotifDismiss() {
+    setShowNotifModal(false)
+    localStorage.setItem("notif_dismissed", "1")
   }
 
   async function handleCalculatePoints() {
@@ -187,12 +205,8 @@ export default function App() {
               background: "rgba(255,255,255,0.15)", color: "white",
             }}>⚙️ Pts</button>
           )}
-          {pushStatus === "idle" && (
-            <button onClick={requestPermission} style={{
-              padding: "3px 8px", borderRadius: "20px", cursor: "pointer",
-              fontSize: "10px", fontWeight: "600", border: "1px solid rgba(255,255,255,0.3)",
-              background: "rgba(255,255,255,0.15)", color: "white",
-            }}>🔔 Notifs</button>
+          {pushStatus === "denied" && (
+            <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>🔕</span>
           )}
           <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
             <span style={{
@@ -219,6 +233,52 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Notification permission modal */}
+      {showNotifModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 100,
+          background: "rgba(0,0,0,0.6)",
+          display: "flex", alignItems: "flex-end", justifyContent: "center",
+        }} onClick={handleNotifDismiss}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: C.card, borderRadius: "20px 20px 0 0",
+            padding: "28px 24px 36px",
+            width: "100%", maxWidth: "480px",
+            border: `1px solid ${C.border}`,
+            boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div style={{ fontSize: "48px", marginBottom: "12px" }}>🔔</div>
+              <div style={{ fontSize: "18px", fontWeight: "800", color: C.text, marginBottom: "8px" }}>
+                Activer les notifications
+              </div>
+              <div style={{ fontSize: "14px", color: C.muted, lineHeight: "1.5" }}>
+                Sois alerté dès qu'un match se termine et que tes paris sont traités.
+                Tu sauras immédiatement si tu as gagné ou perdu.
+              </div>
+            </div>
+            <button onClick={handleNotifAllow} style={{
+              width: "100%", padding: "14px",
+              background: `linear-gradient(135deg, ${C.primary}, ${C.primaryDark})`,
+              border: "none", borderRadius: "14px",
+              color: "white", fontSize: "15px", fontWeight: "700",
+              cursor: "pointer", marginBottom: "10px",
+              boxShadow: "0 4px 16px rgba(29,158,117,0.35)",
+            }}>
+              Activer les notifications
+            </button>
+            <button onClick={handleNotifDismiss} style={{
+              width: "100%", padding: "12px",
+              background: "transparent", border: `1px solid ${C.border}`,
+              borderRadius: "14px", color: C.muted,
+              fontSize: "14px", fontWeight: "600", cursor: "pointer",
+            }}>
+              Plus tard
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Profile panel */}
       {showProfile && (
