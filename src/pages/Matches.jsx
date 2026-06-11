@@ -893,30 +893,36 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
             {!isLocked && (
               <div>
                 {myBet ? (
-                  /* Placed — show locked odds + gain */
-                  <div style={{
-                    padding: "10px 14px", borderRadius: "10px",
-                    background: C.primaryGlow, border: `1px solid ${C.primary}33`,
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                  }}>
-                    <div>
-                      <div style={{ fontSize: "13px", color: C.primary, fontWeight: "700" }}>
-                        ✓ {myBet === "home" ? match.home.name : myBet === "away" ? match.away.name : "Nul"}
+                  /* Placed — cotes live (se mettent à jour avec les nouveaux parieurs) */
+                  (() => {
+                    const liveOddsVal = matchOdds[myBet] ?? lockedOdds
+                    const liveGainVal = liveOddsVal ? Math.round(lockedStake * liveOddsVal) : lockedStake * 2
+                    return (
+                      <div style={{
+                        padding: "10px 14px", borderRadius: "10px",
+                        background: C.primaryGlow, border: `1px solid ${C.primary}33`,
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                      }}>
+                        <div>
+                          <div style={{ fontSize: "13px", color: C.primary, fontWeight: "700" }}>
+                            ✓ {myBet === "home" ? match.home.name : myBet === "away" ? match.away.name : "Nul"}
+                          </div>
+                          <div style={{ fontSize: "11px", color: C.dim, marginTop: "2px", display: "flex", gap: "8px" }}>
+                            {liveOddsVal && (
+                              <span style={{ color: C.odds, fontWeight: "700" }}>{fmtOdds(liveOddsVal)}</span>
+                            )}
+                            <span>Mise : {lockedStake} pts</span>
+                            <span style={{ color: C.primary }}>→ {liveGainVal} pts si correct</span>
+                          </div>
+                        </div>
+                        <button onClick={() => cancel("result")} style={{
+                          padding: "5px 10px", borderRadius: "20px",
+                          background: C.cancel, border: `1px solid ${C.cancelText}44`,
+                          color: C.cancelText, cursor: "pointer", fontSize: "11px", fontWeight: "700",
+                        }}>✕ Annuler</button>
                       </div>
-                      <div style={{ fontSize: "11px", color: C.dim, marginTop: "2px", display: "flex", gap: "8px" }}>
-                        {lockedOdds && (
-                          <span style={{ color: C.odds, fontWeight: "700" }}>{fmtOdds(lockedOdds)}</span>
-                        )}
-                        <span>Mise : {lockedStake} pts</span>
-                        <span style={{ color: C.primary }}>→ {lockedGain} pts si correct</span>
-                      </div>
-                    </div>
-                    <button onClick={() => cancel("result")} style={{
-                      padding: "5px 10px", borderRadius: "20px",
-                      background: C.cancel, border: `1px solid ${C.cancelText}44`,
-                      color: C.cancelText, cursor: "pointer", fontSize: "11px", fontWeight: "700",
-                    }}>✕ Annuler</button>
-                  </div>
+                    )
+                  })()
                 ) : localCredits == null ? (
                   <div style={{ padding: "12px", textAlign: "center", color: C.dim, fontSize: "12px" }}>
                     Chargement…
