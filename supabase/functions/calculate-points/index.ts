@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
     const updatedIds = [...usersUpdated]
     if (updatedIds.length > 0) {
       await adminClient.functions.invoke("send-notification", {
+        headers: { "x-internal-secret": Deno.env.get("INTERNAL_NOTIFY_SECRET") ?? "" },
         body: {
           user_ids: updatedIds,
           title: "Kick off — Résultats",

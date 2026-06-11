@@ -59,7 +59,15 @@ async function sendPush(sub: { endpoint: string; p256dh: string; auth_key: strin
 
 // ── Main handler ───────────────────────────────────────────────────
 
+const INTERNAL_SECRET = Deno.env.get("INTERNAL_NOTIFY_SECRET") ?? ""
+
 Deno.serve(async (req) => {
+  // Only callable server-side (from calculate-points via service role)
+  const secret = req.headers.get("x-internal-secret") ?? ""
+  if (!INTERNAL_SECRET || secret !== INTERNAL_SECRET) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 })
+  }
+
   try {
     const { user_ids, title, body, url } = await req.json() as {
       user_ids: string[]
