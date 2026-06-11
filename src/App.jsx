@@ -41,13 +41,24 @@ export default function App() {
   const { status: pushStatus, requestPermission } = usePushNotifications(user)
 
   const fetchProfile = useCallback(async () => {
-    const { data } = await supabase.rpc("get_my_profile")
+    const { data, error } = await supabase.rpc("get_my_profile")
+    if (error) {
+      console.error("get_my_profile error:", error.message, error.code)
+      // Fallback : lecture directe (fonctionne si le REVOKE n'a pas encore été appliqué)
+      const { data: p2, error: e2 } = await supabase
+        .from("profiles").select("credits, xp, username, is_admin").eq("id", (await supabase.auth.getUser()).data.user?.id).single()
+      if (e2) { console.error("fallback profile error:", e2.message); return }
+      if (p2) { setCredits(p2.credits ?? 500); setXp(p2.xp ?? 0); setUsername(p2.username ?? ""); setIsAdmin(p2.is_admin ?? false) }
+      return
+    }
     const p = data?.[0]
     if (p) {
       setCredits(p.credits ?? 500)
       setXp(p.xp ?? 0)
       setUsername(p.username ?? "")
       setIsAdmin(p.is_admin ?? false)
+    } else {
+      console.warn("get_my_profile returned empty — profile row missing?")
     }
   }, [])
 
