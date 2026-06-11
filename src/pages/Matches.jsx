@@ -497,6 +497,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
   const [oddsMap, setOddsMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [betError, setBetError] = useState("")
   const [expandedAdvanced, setExpandedAdvanced] = useState(new Set())
   const [expandedJournees, setExpandedJournees] = useState(() => {
     const t = new Date().toISOString().slice(0, 10)
@@ -611,7 +612,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
           p_match_id: id, p_bet_type: "result", p_bet_value: betValue,
           p_stake: stake, p_odds: liveOdds,
         })
-        if (rpcErr) { console.error("place_bet result:", rpcErr.message); return }
+        if (rpcErr) { console.error("place_bet result:", rpcErr.message); setBetError("Erreur pari résultat : " + rpcErr.message); return }
         setLocalCredits(prev => prev - stake)
         setSavedStakes(prev => ({ ...prev, [id]: stake }))
         setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
@@ -633,7 +634,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         p_match_id: id, p_bet_type: betType, p_bet_value: betValue,
         p_stake: stake, p_odds: null,
       })
-      if (rpcErr) { console.error(`place_bet ${betType}:`, rpcErr.message); return }
+      if (rpcErr) { console.error(`place_bet ${betType}:`, rpcErr.message); setBetError("Erreur pari avancé : " + rpcErr.message); return }
       const fixedOdds = FIXED_ODDS[betType][betValue]
       setLocalCredits(prev => prev - stake)
       onBalanceChange?.()
@@ -717,6 +718,16 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
     </div>
   )
   if (error) return <p style={{ padding: "2rem", color: "#f87171" }}>{error}</p>
+
+  // Bandeau d'erreur de pari (temporaire — debug)
+  const BetErrorBanner = betError ? (
+    <div onClick={() => setBetError("")} style={{
+      position: "fixed", top: "70px", left: "50%", transform: "translateX(-50%)",
+      zIndex: 999, background: "#ef4444", color: "white", padding: "10px 16px",
+      borderRadius: "10px", fontSize: "13px", fontWeight: "700",
+      maxWidth: "90vw", cursor: "pointer", boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+    }}>⚠️ {betError} (clique pour fermer)</div>
+  ) : null
   if (!matches.length) return (
     <div style={{ padding: "3rem", textAlign: "center", color: C.muted }}>
       <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏟</div>
@@ -1064,6 +1075,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", paddingBottom: "16px" }}>
+      {BetErrorBanner}
       {JOURNEES.filter(j => j.id !== "finale" && byJournee[j.id]?.length).map(j => {
         const sections = j.id !== "finale"
           ? GROUP_ORDER
