@@ -201,8 +201,8 @@ export default function MyBets({ user }) {
                   const gainLine = b.bet_type === "result" && b.odds
                     ? Math.round(b.stake * Number(b.odds))
                     : null
-                  const won = b.processed === true
-                  const lost = b.processed === false
+                  const won = b.won === true
+                  const lost = b.won === false
 
                   return (
                     <div key={i} style={{

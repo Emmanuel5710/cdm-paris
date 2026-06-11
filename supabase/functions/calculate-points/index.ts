@@ -49,16 +49,22 @@ Deno.serve(async (req) => {
 
       const { data: bets } = await adminClient
         .from("bets")
-        .select("id, user_id, bet_value, stake, odds")
+        .select("id, user_id, bet_value, stake")
         .eq("match_id", match.id)
         .eq("bet_type", "result")
         .eq("processed", false)
 
-      for (const bet of bets ?? []) {
+      // Parimutuel payout: recalculated server-side from actual stake distribution
+      // Never trust client-provided odds stored in the DB
+      const allBets = bets ?? []
+      const totalPool = allBets.reduce((s, b) => s + (b.stake ?? 10), 0)
+      const winnerPool = allBets.filter(b => b.bet_value === result).reduce((s, b) => s + (b.stake ?? 10), 0)
+      const computedOdds = winnerPool > 0 ? totalPool / winnerPool : 2.0
+
+      for (const bet of allBets) {
         const correct = bet.bet_value === result
         const stake = bet.stake ?? 10
-        const odds = bet.odds ?? 2.0
-        const payout = Math.round(stake * odds)
+        const payout = Math.round(stake * Math.max(1.05, Math.min(computedOdds, 50)))
 
         if (correct) {
           await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })

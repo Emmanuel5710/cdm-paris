@@ -573,9 +573,15 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
       .from("bets").select("id").eq("user_id", user.id).eq("match_id", id).eq("bet_type", betType).maybeSingle()
 
     if (existing) {
-      // Update prediction (and refresh locked odds)
-      await supabase.from("bets").update({ bet_value: betValue, odds: liveOdds }).eq("id", existing.id)
-      if (betType === "result") setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
+      if (betType === "result") {
+        const { error: updErr } = await supabase.rpc("update_bet", {
+          p_match_id: id, p_bet_value: betValue, p_odds: liveOdds,
+        })
+        if (updErr) { console.error("update_bet:", updErr.message); return }
+        setSavedOdds(prev => ({ ...prev, [id]: liveOdds }))
+      } else {
+        await supabase.from("bets").update({ bet_value: betValue }).eq("id", existing.id)
+      }
     } else {
       if (betType === "result" && stake > 0) {
         const { error: rpcErr } = await supabase.rpc("place_bet", {
