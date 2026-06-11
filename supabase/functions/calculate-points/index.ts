@@ -68,7 +68,9 @@ Deno.serve(async (req) => {
         const payout = Math.round(stake * Math.max(1.05, Math.min(computedOdds, 50)))
 
         if (correct) {
-          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
+          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout, original_stake: stake })
+        } else {
+          await adminClient.rpc("deduct_bet_loss", { uid: bet.user_id, stake })
         }
 
         await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
@@ -88,9 +90,12 @@ Deno.serve(async (req) => {
         const correct = bet.bet_value === "5+"
           ? actualGoals >= 5
           : actualGoals === parseInt(bet.bet_value)
+        const stake = bet.stake ?? 10
         if (correct) {
-          const payout = Math.round((bet.stake ?? 10) * Number(bet.odds ?? 2.8))
-          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
+          const payout = Math.round(stake * Number(bet.odds ?? 2.8))
+          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout, original_stake: stake })
+        } else {
+          await adminClient.rpc("deduct_bet_loss", { uid: bet.user_id, stake })
         }
         await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
         usersUpdated.add(bet.user_id)
@@ -107,9 +112,12 @@ Deno.serve(async (req) => {
       const bothScored = hs > 0 && as_ > 0
       for (const bet of bttsBets ?? []) {
         const correct = bet.bet_value === "yes" ? bothScored : !bothScored
+        const stake = bet.stake ?? 10
         if (correct) {
-          const payout = Math.round((bet.stake ?? 10) * Number(bet.odds ?? 1.9))
-          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
+          const payout = Math.round(stake * Number(bet.odds ?? 1.9))
+          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout, original_stake: stake })
+        } else {
+          await adminClient.rpc("deduct_bet_loss", { uid: bet.user_id, stake })
         }
         await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
         usersUpdated.add(bet.user_id)
@@ -148,6 +156,9 @@ Deno.serve(async (req) => {
         const gain = cb.stake * cb.multiplier
         await adminClient.rpc("adjust_credits", { uid: cb.user_id, delta: gain })
         await adminClient.rpc("adjust_xp",      { uid: cb.user_id, delta: gain })
+      } else {
+        // stake already deducted at placement; deduct same amount from XP
+        await adminClient.rpc("deduct_bet_loss", { uid: cb.user_id, stake: cb.stake })
       }
 
       await adminClient
