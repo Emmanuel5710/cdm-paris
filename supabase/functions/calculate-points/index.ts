@@ -24,7 +24,8 @@ Deno.serve(async (req) => {
       status: 401, headers: { "Content-Type": "application/json" },
     })
   }
-  const { data: profile } = await userClient.from("profiles").select("is_admin").eq("id", user.id).single()
+  const { data: profileData } = await userClient.rpc("get_my_profile")
+  const profile = profileData?.[0]
   if (!profile?.is_admin) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403, headers: { "Content-Type": "application/json" },
@@ -73,6 +74,47 @@ Deno.serve(async (req) => {
         await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
         usersUpdated.add(bet.user_id)
       }
+
+      // ── Paris total_goals ──────────────────────────────────────
+      const { data: goalsBets } = await adminClient
+        .from("bets")
+        .select("id, user_id, bet_value, stake, odds")
+        .eq("match_id", match.id)
+        .eq("bet_type", "total_goals")
+        .eq("processed", false)
+
+      const actualGoals = hs + as_
+      for (const bet of goalsBets ?? []) {
+        const correct = bet.bet_value === "5+"
+          ? actualGoals >= 5
+          : actualGoals === parseInt(bet.bet_value)
+        if (correct) {
+          const payout = Math.round((bet.stake ?? 10) * Number(bet.odds ?? 2.8))
+          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
+        }
+        await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
+        usersUpdated.add(bet.user_id)
+      }
+
+      // ── Paris btts (les deux équipes marquent) ─────────────────
+      const { data: bttsBets } = await adminClient
+        .from("bets")
+        .select("id, user_id, bet_value, stake, odds")
+        .eq("match_id", match.id)
+        .eq("bet_type", "btts")
+        .eq("processed", false)
+
+      const bothScored = hs > 0 && as_ > 0
+      for (const bet of bttsBets ?? []) {
+        const correct = bet.bet_value === "yes" ? bothScored : !bothScored
+        if (correct) {
+          const payout = Math.round((bet.stake ?? 10) * Number(bet.odds ?? 1.9))
+          await adminClient.rpc("award_bet_win", { uid: bet.user_id, delta_balance: payout })
+        }
+        await adminClient.from("bets").update({ processed: true, won: correct }).eq("id", bet.id)
+        usersUpdated.add(bet.user_id)
+      }
+
       matchesProcessed++
     }
 

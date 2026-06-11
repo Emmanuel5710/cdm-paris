@@ -26,7 +26,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [page, setPage] = useState("matches")
-  const [credits, setCredits] = useState(0)
+  const [credits, setCredits] = useState(null)
   const [xp, setXp] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
   const [activeBettors, setActiveBettors] = useState(null)
@@ -188,7 +188,7 @@ export default function App() {
               background: "rgba(255,255,255,0.18)", borderRadius: "8px",
               padding: "2px 8px",
             }}>
-              💰 {(credits ?? 0).toLocaleString("fr-FR")}
+              💰 {credits != null ? credits.toLocaleString("fr-FR") : "…"}
             </span>
             <span style={{
               fontSize: "11px", fontWeight: "700", color: "white",

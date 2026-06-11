@@ -9,6 +9,8 @@ const C = {
 
 const BET_META = {
   result:           { icon: "⚽", label: "Résultat" },
+  total_goals:      { icon: "⚽", label: "Total de buts" },
+  btts:             { icon: "🥅", label: "Les 2 équipes marquent" },
   exact_goals:      { icon: "🎯", label: "Buts exacts" },
   exact_corners:    { icon: "🚩", label: "Corners" },
   red_card_team:    { icon: "🟥", label: "Carton rouge" },
@@ -24,6 +26,10 @@ function betValueLabel(type, value, home, away) {
     if (value === "away") return `Victoire ${away}`
     if (value === "draw") return "Match nul"
   }
+  if (type === "total_goals") {
+    return value === "5+" ? "5 buts ou plus" : `Exactement ${value} but${Number(value) > 1 ? "s" : ""}`
+  }
+  if (type === "btts") return value === "yes" ? "Oui" : "Non"
   if (type === "exact_goals") return `${value} but${Number(value) > 1 ? "s" : ""}`
   if (type === "exact_corners") return `${value} corner${Number(value) > 1 ? "s" : ""}`
   if (type === "red_card_team" || type === "yellow_card_team") {
@@ -198,7 +204,7 @@ export default function MyBets({ user }) {
               <div>
                 {bets.map((b, i) => {
                   const meta = BET_META[b.bet_type] ?? { icon: "🎲", label: b.bet_type }
-                  const gainLine = b.bet_type === "result" && b.odds
+                  const gainLine = b.odds && b.stake
                     ? Math.round(b.stake * Number(b.odds))
                     : null
                   const won = b.won === true
