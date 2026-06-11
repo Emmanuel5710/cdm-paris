@@ -106,12 +106,10 @@ export default function League({ user }) {
     setError("")
     const code = joinCode.trim().toUpperCase()
     if (!code) { setError("Entre un code d'invitation"); return }
-    const { data: lg } = await supabase.from("leagues").select("*").eq("invite_code", code).single()
-    if (!lg) { setError("Code invalide"); return }
-    const { data: existing } = await supabase.from("league_members").select("id")
-      .eq("league_id", lg.id).eq("user_id", user.id).single()
-    if (!existing) await supabase.from("league_members").insert({ league_id: lg.id, user_id: user.id })
-    setLeague(lg)
+    const { data, error: err } = await supabase.rpc("join_league_by_code", { p_invite_code: code })
+    if (err) { setError(err.message); return }
+    if (!data?.[0]) { setError("Code invalide"); return }
+    setLeague(data[0])
   }
 
   async function shareLeague() {

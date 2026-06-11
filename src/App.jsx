@@ -40,14 +40,14 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false)
   const { status: pushStatus, requestPermission } = usePushNotifications(user)
 
-  const fetchProfile = useCallback(async (uid) => {
-    const { data } = await supabase
-      .from("profiles").select("credits, xp, username, is_admin").eq("id", uid).single()
-    if (data) {
-      setCredits(data.credits ?? 500)
-      setXp(data.xp ?? 0)
-      setUsername(data.username ?? "")
-      setIsAdmin(data.is_admin ?? false)
+  const fetchProfile = useCallback(async () => {
+    const { data } = await supabase.rpc("get_my_profile")
+    const p = data?.[0]
+    if (p) {
+      setCredits(p.credits ?? 500)
+      setXp(p.xp ?? 0)
+      setUsername(p.username ?? "")
+      setIsAdmin(p.is_admin ?? false)
     }
   }, [])
 
@@ -73,16 +73,15 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return
-    // Charger le profil initial
-    supabase.from("profiles").select("credits, xp, username, is_admin").eq("id", user.id).single()
-      .then(({ data }) => { if (data) { setCredits(data.credits); setXp(data.xp); setUsername(data.username ?? ""); setIsAdmin(data.is_admin ?? false) } })
+    // Charger le profil initial via RPC (credits + is_admin protégés)
+    fetchProfile()
     // Écouter les changements en temps réel
     const channel = supabase.channel("profile-" + user.id)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: "id=eq." + user.id },
-        (payload) => { setCredits(payload.new.credits); setXp(payload.new.xp) })
+        () => fetchProfile())
       .subscribe()
     return () => channel.unsubscribe()
-  }, [user])
+  }, [user, fetchProfile])
 
   // Active bettors: Realtime + 30s polling
   useEffect(() => {
@@ -112,24 +111,16 @@ export default function App() {
     if (error) alert("Erreur : " + error.message)
     else {
       alert(`✅ ${data.matchesProcessed} matchs traités, ${data.usersUpdated} joueurs mis à jour`)
-      if (user) fetchProfile(user.id)
+      if (user) fetchProfile()
     }
   }
 
   function onBalanceChange() {
-    if (user) fetchProfile(user.id)
+    if (user) fetchProfile()
   }
 
   async function refreshProfile() {
-    const { data } = await supabase
-      .from("profiles")
-      .select("credits, xp")
-      .eq("id", user.id)
-      .single()
-    if (data) {
-      setCredits(data.credits)
-      setXp(data.xp)
-    }
+    fetchProfile()
   }
 
   if (authLoading) return (
