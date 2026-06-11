@@ -768,7 +768,10 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
         const myBet = bets[`${matchId}-result`]
         const isLive = match.state === "in"
         const isFinished = match.state === "post"
-        const isLocked = isLive || isFinished
+        // Lock as soon as the match's scheduled kickoff time has passed,
+        // even before ESPN reflects state="in" (covers the ~60s polling gap)
+        const kickoffPassed = match.date ? new Date(match.date) <= new Date() : false
+        const isLocked = isLive || isFinished || kickoffPassed
         const isAdvancedOpen = expandedAdvanced.has(match.id)
         const stake = getStake(matchId)
         const canBet = safeBalance - stake >= MIN_BALANCE
@@ -850,7 +853,7 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                 color: isLive ? "white" : isFinished ? C.muted : C.primary,
                 letterSpacing: "0.3px", textTransform: "uppercase",
               }}>
-                {isLive ? `● ${match.displayClock}` : isFinished ? "Terminé" : formatFrenchDate(match.date)}
+                {isLive ? `● ${match.displayClock}` : isFinished ? "Terminé" : kickoffPassed ? "🔒 En attente" : formatFrenchDate(match.date)}
               </span>
               {match.venue && (
                 <div style={{ textAlign: "right", marginLeft: "8px" }}>
@@ -1046,6 +1049,17 @@ export default function Matches({ user, credits, onBalanceChange, onBetPlaced })
                     </div>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* No bet + locked */}
+            {isLocked && !myBet && (
+              <div style={{
+                marginTop: "4px", padding: "8px 14px", borderRadius: "8px",
+                background: "rgba(100,116,139,0.1)", border: `1px solid ${C.border}`,
+                textAlign: "center",
+              }}>
+                <span style={{ fontSize: "12px", color: C.dim }}>🔒 Paris fermés — aucun pronostic enregistré</span>
               </div>
             )}
 
