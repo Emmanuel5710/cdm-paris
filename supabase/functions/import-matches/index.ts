@@ -5,12 +5,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 }
 
+const ESPN_URL = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=200&dates=20260611-20260719"
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
 
-  // ── Auth guard : JWT requis + is_admin = true ──────────────────
   const authHeader = req.headers.get("Authorization")
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -28,26 +29,33 @@ Deno.serve(async (req) => {
       status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   }
-  // Tout utilisateur authentifié peut déclencher le sync des matchs
-  // ── /Auth guard ────────────────────────────────────────────────
 
   try {
-    const response = await fetch("https://worldcup26.ir/get/games")
-    const data = await response.json()
+    const res = await fetch(ESPN_URL)
+    const data = await res.json()
 
-    const matches = data.games.map((g: Record<string, string>) => {
-      const [datePart, timePart] = g.local_date.split(" ")
-      const [month, day, year] = datePart.split("/")
+    const matches = (data.events ?? []).map((ev: Record<string, unknown>) => {
+      const comp = (ev.competitions as Record<string, unknown>[])?.[0]
+      const competitors = (comp?.competitors as Record<string, unknown>[]) ?? []
+      const home = competitors.find((c) => c.homeAway === "home")
+      const away = competitors.find((c) => c.homeAway === "away")
+      const state = (comp?.status as Record<string, unknown>)?.type
+        ? ((comp!.status as Record<string, unknown>).type as Record<string, unknown>).state as string
+        : "pre"
+      const status = state === "in" ? "inplay" : state === "post" ? "finished" : "notstarted"
+      const homeScore = state === "pre" ? null : parseInt((home?.score as string) ?? "0")
+      const awayScore = state === "pre" ? null : parseInt((away?.score as string) ?? "0")
+
       return {
-        id: parseInt(g.id),
-        home_team: g.home_team_name_en || g.home_team_label || "TBD",
-        away_team: g.away_team_name_en || g.away_team_label || "TBD",
-        match_date: new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T${timePart}:00`).toISOString(),
-        group_name: g.group,
-        match_type: g.type,
-        home_score: g.home_score === "0" && g.finished === "FALSE" ? null : parseInt(g.home_score),
-        away_score: g.away_score === "0" && g.finished === "FALSE" ? null : parseInt(g.away_score),
-        status: g.time_elapsed === "notstarted" ? "notstarted" : g.finished === "TRUE" ? "finished" : "inplay",
+        id: parseInt(ev.id as string),
+        home_team: (home?.team as Record<string, unknown>)?.displayName ?? "TBD",
+        away_team: (away?.team as Record<string, unknown>)?.displayName ?? "TBD",
+        match_date: ev.date as string,
+        group_name: null,
+        match_type: "group",
+        home_score: homeScore,
+        away_score: awayScore,
+        status,
       }
     })
 
