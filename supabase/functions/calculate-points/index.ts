@@ -5,33 +5,40 @@ const adminClient = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 )
 
+const INTERNAL_SECRET = Deno.env.get("INTERNAL_NOTIFY_SECRET") ?? ""
+
 Deno.serve(async (req) => {
-  // ── Auth guard : JWT requis + is_admin = true ──────────────────
-  const authHeader = req.headers.get("Authorization")
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401, headers: { "Content-Type": "application/json" },
-    })
+  // ── Auth : secret interne (appel serveur) OU JWT admin (appel manuel) ──
+  const internalSecret = req.headers.get("x-internal-secret")
+  const isInternalCall = internalSecret && internalSecret === INTERNAL_SECRET
+
+  if (!isInternalCall) {
+    const authHeader = req.headers.get("Authorization")
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json" },
+      })
+    }
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+    const { data: { user }, error: authErr } = await userClient.auth.getUser()
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json" },
+      })
+    }
+    const { data: profileData } = await userClient.rpc("get_my_profile")
+    const profile = profileData?.[0]
+    if (!profile?.is_admin) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { "Content-Type": "application/json" },
+      })
+    }
   }
-  const userClient = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  )
-  const { data: { user }, error: authErr } = await userClient.auth.getUser()
-  if (authErr || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401, headers: { "Content-Type": "application/json" },
-    })
-  }
-  const { data: profileData } = await userClient.rpc("get_my_profile")
-  const profile = profileData?.[0]
-  if (!profile?.is_admin) {
-    return new Response(JSON.stringify({ error: "Forbidden" }), {
-      status: 403, headers: { "Content-Type": "application/json" },
-    })
-  }
-  // ── /Auth guard ────────────────────────────────────────────────
+  // ── /Auth ──────────────────────────────────────────────────────
 
   try {
     const { data: matches } = await adminClient

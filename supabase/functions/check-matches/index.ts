@@ -124,6 +124,18 @@ Deno.serve(async (req) => {
     await adminClient.from("matches").upsert(updates, { onConflict: "id" })
   }
 
+  // Auto-settle bets when a match finishes
+  const finishedMatchIds = events
+    .filter(ev => ev.title.startsWith("🏁"))
+    .map(ev => ev.match_id)
+
+  if (finishedMatchIds.length > 0) {
+    await adminClient.functions.invoke("calculate-points", {
+      headers: { "x-internal-secret": INTERNAL_SECRET },
+      body: {},
+    })
+  }
+
   // Notify betters for each event
   let totalSent = 0
   for (const ev of events) {
@@ -143,7 +155,7 @@ Deno.serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ events: events.length, updates: updates.length, notifications_sent: totalSent }),
+    JSON.stringify({ events: events.length, updates: updates.length, notifications_sent: totalSent, settled: finishedMatchIds.length }),
     { headers: { "Content-Type": "application/json" } }
   )
 })
